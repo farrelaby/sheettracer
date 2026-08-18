@@ -7,9 +7,11 @@ SheetTracer reads spreadsheet contents (formulas, for IMPORTRANGE detection) and
 | Scope | Purpose | Sensitivity |
 |---|---|---|
 | `https://www.googleapis.com/auth/spreadsheets.readonly` | Read cell data + formulas | non-sensitive (read-only) |
-| `https://www.googleapis.com/auth/drive.metadata.readonly` | Read `version`/`modifiedTime` for change detection | non-sensitive (metadata only) |
+| `https://www.googleapis.com/auth/drive.metadata.readonly` | Read `version`/`modifiedTime` (change detection) + `permissions` (visibility) | non-sensitive (metadata only) |
 
 Both are least-privilege. We never request write access.
+
+> **Visibility note**: visibility classification reads the `permissions` field via `files.get` (extended field mask — no extra request). Google's Drive reference lists `drive.metadata.readonly` as acceptable for the permissions resource, but this must be verified during Milestone 1 auth testing. If Google rejects the `permissions` field under this scope, add `https://www.googleapis.com/auth/drive.permissions.readonly` ("View permissions for files in your Google Drive") — still read-only and non-sensitive.
 
 ## Author setup (one-time, Google Cloud Console)
 

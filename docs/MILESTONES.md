@@ -28,33 +28,34 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 2 — Add spreadsheet + metadata
 
 **Deliverables**
-- `internal/sheets/`: parse Google Sheets URL → id; `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`).
-- `internal/db/`: migrations, connection (WAL), `spreadsheets`/`sheets`/`settings` repositories.
-- `SheetsService.Add(url, notes)` upserts and returns metadata; dedup on `google_id`.
-- `AddSheet.svelte` + `SpreadsheetList.svelte`.
+- `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `permissions(id,type,role)`).
+- `internal/db/`: migrations (incl. `spreadsheets.visibility`), connection (WAL), `spreadsheets`/`sheets`/`settings` repositories.
+- `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility`, dedup on `google_id`.
+- `AddSheet.svelte` (404 error state) + `SpreadsheetList.svelte` (visibility icons).
 
-**Acceptance**: paste a link → workbook appears in the list with title/tabs; adding the same link twice dedups.
+**Acceptance**: paste a link → workbook appears in the list with title/tabs + visibility icon; a link to a sheet you can't access shows "no access / not found"; adding the same link twice dedups.
 
 ## Milestone 3 — Parallel scanner + graph storage
 
 **Deliverables**
 - `internal/scan/`: IMPORTRANGE extractor, chunked `values.batchGet` (FORMULA render, field-masked), worker pool + results channel + single merge writer.
 - Edge upsert/seen/purge lifecycle; `scan_cache` writes; `scan_runs` logging.
+- Preflight refreshes `visibility` (same `files.get`); merge resolves external target titles/visibility (cached `files.get`, 404 → `unknown`).
 - `ScanService.Rescan()` and `RescanOne(id)`; `scan:progress` + `graph:updated` events.
-- Per-workbook 403 handling → `status='partial'`.
+- Per-workbook 403 handling → `status='partial'`; `GraphPayload` nodes carry `visibility`.
 
-**Acceptance**: add 2–3 sheets with cross-references → edges persisted; a removed IMPORTRANGE disappears after rescan; a no-access sheet fails gracefully.
+**Acceptance**: add 2–3 sheets with cross-references → edges persisted + target leaves show title/visibility; a removed IMPORTRANGE disappears after rescan; a no-access sheet fails gracefully; a target you can't access shows `unknown`.
 
 ## Milestone 4 — Graph view
 
 **Deliverables**
 - Add Cytoscape.js + `fcose`.
 - `GraphCanvas.svelte`: instance-in-`onMount`, `cy.batch` updates, fan-in node sizing via `mapData`, cluster coloring, external-vs-internal edges, hover labels, focus-on-hover.
-- `NodeDetailPanel.svelte`: imports, fan-in, modified time, open-in-Google.
-- `GraphLegend.svelte`.
-- `GraphService.Graph()` returns `GraphPayload` (`docs/FRONTEND.md`).
+- `NodeDetailPanel.svelte`: imports, fan-in, visibility badge, modified time, open-in-Google, leaf → "Track this sheet".
+- `GraphLegend.svelte` (incl. visibility icons); visibility icon overlays on nodes.
+- `GraphService.Graph()` returns `GraphPayload` with `visibility` per node (`docs/FRONTEND.md`).
 
-**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; click shows detail; layout re-runs on update.
+**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; every node shows its visibility icon; click shows detail (incl. `unknown`/no-access state); leaf offers "Track this sheet"; layout re-runs on update.
 
 ## Milestone 5 — Cache revalidation + scan triggers
 

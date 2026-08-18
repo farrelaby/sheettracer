@@ -17,12 +17,12 @@ Svelte 5 + TypeScript + Vite, generated bindings from `@wailsio/runtime`, Cytosc
 ```
 App.svelte            — shell, routing between views, top-level state
 ├─ OAuthStatus.svelte — connect/disconnect, auth states (docs/GOOGLE_OAUTH.md)
-├─ AddSheet.svelte    — paste link → fetch metadata → notes → add
+├─ AddSheet.svelte    — paste link → fetch metadata → notes → add (shows "no access / not found" on files.get 404)
 ├─ SpreadsheetList.svelte — tracked workbooks + per-item rescan/remove
 ├─ ScanProgress.svelte    — live scan:progress events
 └─ GraphView.svelte       — the Cytoscape canvas
    ├─ GraphCanvas.svelte  — owns the cytoscape instance
-   ├─ NodeDetailPanel.svelte — selected-node details
+   ├─ NodeDetailPanel.svelte — selected-node details (visibility badge, imports, open-in-Google, leaf → "Track this sheet")
    └─ GraphLegend.svelte     — color/edge meaning
 ```
 
@@ -49,9 +49,15 @@ node: {
 ```
 
 - Color by cluster (fcose exposes cluster ids) or by node kind (tracked vs external leaf).
+- **Visibility icon** on every node (small overlay, top-right): globe = `public`, link/chain = `link-only`, lock = `private`, muted dash = `unknown` ("not accessible / not found"). Inline SVG, plain CSS (no icon lib). Shows in the list and detail panel too.
+- External leaf nodes resolve best-effort title + visibility (see `docs/SCANNING.md`); `unknown` leaves show the raw id as fallback label.
 - Edge color: external import vs internal; arrows show direction (`source → target` = source imports target).
 - Edge labels (the range, e.g. `Sheet1!A1:C10`) shown **on hover/select only** to avoid clutter.
 - Hover → highlight neighborhood, fade the rest (Obsidian focus mode).
+
+## Leaf node "Track this sheet"
+
+External leaves (sheets the user didn't add) get a **Track this sheet** action in the detail panel — the only path to content-scanning a discovered target. It runs the normal add flow (`SheetsService.Add`) for that URL; on success the leaf upgrades to a tracked node.
 
 ## Events
 
@@ -80,6 +86,7 @@ interface GraphPayload {
     label: string;         // title
     fanIn: number;         // inbound import count → node size
     kind: 'tracked' | 'external';
+    visibility: 'public' | 'link-only' | 'private' | 'unknown';
     modifiedTime?: string;
     url?: string;
   }>;

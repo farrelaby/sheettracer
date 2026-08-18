@@ -27,6 +27,7 @@ CREATE TABLE spreadsheets (
     notes           TEXT NOT NULL DEFAULT '',   -- user-added metadata
     version         TEXT,                   -- Drive files.get version (change signal)
     modified_time   TEXT,                   -- RFC3339, for display
+    visibility      TEXT NOT NULL DEFAULT 'private',  -- 'public'|'link-only'|'private'|'unknown' (Drive permissions)
     last_scan_at    TEXT,
     added_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -92,6 +93,7 @@ CREATE TABLE settings (
 ## Graph model
 
 - **Node** = a row in `spreadsheets` (file-level granularity; tabs live in `sheets` as metadata).
+- **Node visibility** (`spreadsheets.visibility`) is derived from Drive permissions during `files.get` (`type='anyone'` → `public`, `type='anyoneWithLink'` → `link-only`, otherwise `private`). An external target we can't access resolves to `unknown` (Drive returns 404 `notFound` for both "no access" and "doesn't exist" — see `docs/SCANNING.md`).
 - **Edge** = a row in `imports`: `source_spreadsheet → target_spreadsheet`.
 - **Fan-in** (drives node sizing in the graph UI) is the count of inbound `imports` rows for a spreadsheet — computed at read time:
 
@@ -109,7 +111,9 @@ A scan merge is the only writer during a run:
 2. **Mark `seen=0`** on all edges belonging to scanned workbooks before merging.
 3. **Purge** edges where `seen=0` after the merge — dependencies that disappeared are removed, so the graph reflects reality.
 4. Rewrite `scan_cache` blobs for changed tabs; drop unchanged entries.
-5. Update `spreadsheets.version` / `modified_time`.
+5. Update `spreadsheets.version` / `modified_time` / `visibility` (permissions from the same `files.get`).
+
+> Note: sharing changes don't reliably bump the Drive `version`, so `visibility` is refreshed on every scan (preflight always re-reads `files.get`), not pushed instantly.
 
 ## Migrations
 

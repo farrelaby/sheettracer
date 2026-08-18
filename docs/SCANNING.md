@@ -49,6 +49,7 @@ See `docs/ARCHITECTURE.md` for the diagram. Summary:
 |---|---|---|
 | `version` | `drive.files.get` (Drive API) | Monotonic change detection — the primary skip signal |
 | `modifiedTime` | `drive.files.get` | Display ("last modified") + secondary check |
+| `permissions` | `drive.files.get` (`fields=permissions(id,type,role)`) | Visibility classification (public/link-only/private) |
 | `scan_cache` (SQLite) | local | Reuse of raw payloads when a workbook is clean |
 
 Preflight per workbook:
@@ -62,13 +63,41 @@ Notes:
 
 - **Granularity is per-file, not per-tab or per-cell.** The API exposes no per-tab change timestamps, so we don't chase finer revalidation. This is still correct for us: any formula change necessarily bumps the workbook `version`; value-only changes (e.g., imported data refreshing) do *not* change formulas, so skipping them is correct.
 - The Sheets API `spreadsheets.get` resource has **no documented `modifiedTime`/etag** — do not rely on undocumented etag headers. Drive is the documented, reliable source.
+- `permissions` comes from the same `files.get` call (extended field mask) — no extra request. Sharing changes don't reliably bump `version`, so visibility is refresh-on-scan, which is fine here.
+
+## Visibility (public vs private)
+
+Derived from the file's `permissions` list during `files.get`:
+
+| State | Signal | Meaning |
+|---|---|---|
+| `public` | a permission with `type='anyone'` | Searchable by anyone |
+| `link-only` | `type='anyoneWithLink'` | Anyone with the link can view |
+| `private` | only `type='user'` / `'group'` / `'domain'` | Shared with specific people/orgs only |
+| `unknown` | `files.get` fails | See below |
+
+**`unknown` = failed `files.get`.** Drive returns HTTP 404 `notFound` for both "no read access" and "file doesn't exist" — deliberately, so the API doesn't leak whether a file exists. The backend treats both identically; the UI shows a muted "not accessible / not found" state. A genuinely public file is always readable by any authenticated user, so a 404 reliably means private-to-you or nonexistent — safe to classify as `unknown`.
+
+## External target resolution (hybrid)
+
+Tracked sheets' IMPORTRANGE targets that the user hasn't added appear as leaf nodes. During the scan merge:
+
+1. Collect target spreadsheet ids from extracted edges that aren't already in `spreadsheets`.
+2. Best-effort `files.get` each (same field mask: `name` + `permissions`) to resolve the **title** and **visibility** for display. Cache the result in `scan_cache` so each new target costs ~1 call, not 1-per-scan.
+3. On 404 → store as `unknown` (no title, "not accessible / not found" state).
+
+Rules:
+
+- **Metadata only** — external targets are never content-scanned. "Scanning strangers' sheets is out of scope" (fan-in section below).
+- The frontend offers a **"Track this sheet"** action on a leaf node, which runs the normal add flow for that URL — the *only* way a discovered target becomes a scanned node.
+- If the user later tracks a target, it upgrades from leaf to a full tracked node; edges to it are unchanged.
 
 ## Edge lifecycle (per scan merge)
 
 1. Before merging, mark all edges of scanned workbooks `seen=0`.
 2. For each extracted edge: upsert (unique on source/target/range/tab), increment `formula_count`, set `seen=1`, refresh `last_seen_at`.
 3. Purge edges still `seen=0` after the merge — dependencies that disappeared are removed from the graph.
-4. Store clean tabs in `scan_cache`; refresh `spreadsheets.version`/`modified_time`.
+4. Store clean tabs in `scan_cache`; refresh `spreadsheets.version`/`modified_time`; resolve + refresh external target titles/visibility.
 
 ## Scan triggers
 
@@ -87,7 +116,7 @@ SELECT target_spreadsheet AS spreadsheet_id, COUNT(*) AS fan_in
 FROM imports GROUP BY target_spreadsheet;
 ```
 
-This feeds node sizing in the graph UI. Fan-in is computed over **tracked** sheets only — external sheets referenced by IMPORTRANGE appear as leaf nodes (URL shown, not scanned) unless the user tracks them too. Scanning strangers' sheets is out of scope.
+This feeds node sizing in the graph UI. Fan-in is computed over **tracked** sheets only — external sheets referenced by IMPORTRANGE appear as leaf nodes with best-effort title + visibility (see "External target resolution" above); they're never scanned unless the user tracks them too. Scanning strangers' sheets is out of scope.
 
 ## Error handling
 
