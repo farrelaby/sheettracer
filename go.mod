@@ -1,4 +1,4 @@
-module sheettrace
+module sheettracer
 
 go 1.25.0
 

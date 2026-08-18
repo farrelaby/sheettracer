@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Implementation milestones (`docs/MILESTONES.md`)
 - `CHANGELOG.md` (this file).
 
-### Notes
+### Changed
 
-- `go.mod` module is still the template placeholder `changeme` until Milestone 0.
+- Renamed Go module to `sheettracer`; bindings regenerated under `frontend/bindings/sheettracer`.
+- Removed the template `GreetService` demo and time ticker; app metadata and window title now `SheetTracer`.

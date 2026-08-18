@@ -2,7 +2,7 @@
 
 Implementation roadmap. Each milestone has deliverables and acceptance criteria. Commits should be small and focused (one logical change per commit) per the project's git convention.
 
-> Setup note: `go.mod` still says `module changeme` from the scaffold — Milestone 0 fixes it to `module sheettracer`.
+> Milestone 0 status: **done** — `go.mod` is `module sheettracer`, bindings live under `frontend/bindings/sheettracer`, template demo code is removed.
 
 ## Milestone 0 — Scaffold cleanup
 
