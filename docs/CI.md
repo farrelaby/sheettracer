@@ -34,9 +34,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
+          bun-version: '1.3'
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
       - name: Install Task
@@ -73,5 +73,6 @@ Signing is a follow-up; the base workflow above works unsigned for the first rel
 ## Notes
 
 - `wails3 build` on each runner produces a native binary; no `setup:docker`, no `wails-cross` image, no podman/docker alias hacks.
+- Frontend deps use **bun** (the Taskfile's `PACKAGE_MANAGER` default) via `oven-sh/setup-bun`; `bun.lock` is committed and provides deterministic installs. `setup-bun` also provides the Node-compatible runtime that vite/svelte-check need, so a separate `setup-node` step is unnecessary.
 - `frontend/dist` is built by `wails3 build` (the Taskfile handles the frontend build), so no separate frontend job is needed.
 - A plain **push** (non-tag) workflow can reuse the same matrix for CI smoke builds (`wails3 dev`/`wails3 build` as a compile check).
