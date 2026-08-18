@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* Match the Wails window background (application.NewRGB(6, 7, 15)). */
+body {
+  color: #fff;
+  background: #06070f;
+}
