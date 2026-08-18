@@ -1,4 +1,4 @@
-module changeme
+module sheettrace
 
 go 1.25.0
 
