@@ -3,6 +3,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import wails from "@wailsio/runtime/plugins/vite";
 import tailwindcss from '@tailwindcss/vite'
 
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
@@ -11,4 +12,9 @@ export default defineConfig({
     strictPort: true,
   },
   plugins: [ tailwindcss(),svelte(), wails("./bindings")],
+  resolve:{
+    alias: {
+      '@': '/src',
+    }
+  }
 });
