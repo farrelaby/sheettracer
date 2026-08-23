@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install Wails v3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libnss3-dev pkg-config
+
+      - name: Install frontend dependencies
+        run: cd frontend && bun install
+
+      - name: Validate OAuth credential charset
+        env:
+          CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          if [[ ! "$CLIENT_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::GOOGLE_CLIENT_ID is unset or contains unexpected characters (expected [A-Za-z0-9._-])"
+            exit 1
+          fi
+          if [[ -z "$CLIENT_SECRET" || ! "$CLIENT_SECRET" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "::error::GOOGLE_CLIENT_SECRET is unset or contains unexpected characters (expected [A-Za-z0-9_-])"
+            exit 1
+          fi
+
+      # Generated fresh into the ephemeral workspace; gitignored so it can
+      # never be committed. Values are interpolated with %s inside literal
+      # quotes — safe because both values passed the strict charset checks
+      # above (no quotes/backslashes/$ possible). See
+      # internal/oauth/credentials_prod.go.example.
+      - name: Materialize OAuth credentials
+        env:
+          CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          printf '//go:build production\n\npackage oauth\n\n// Generated in CI from the GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET secrets.\nvar (\n\tDefaultClientID     = "%s"\n\tDefaultClientSecret = "%s"\n)\n' \
+            "$CLIENT_ID" "$CLIENT_SECRET" > internal/oauth/credentials_prod.go
+          gofmt -w internal/oauth/credentials_prod.go
+
+      # The wails3 pipeline passes -tags production on every platform, which
+      # compiles in the generated credentials and drops the dev defaults.
+      - name: Build
+        run: wails3 task build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sheettracer-${{ matrix.os }}
+          path: bin/*
+          if-no-files-found: error
