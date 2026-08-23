@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 
 	database "sheettracer/internal/db"
+	"sheettracer/internal/keyring"
+	"sheettracer/internal/oauth"
+	"sheettracer/internal/services"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -21,6 +24,9 @@ var assets embed.FS
 
 // main function serves as the application's entry point. It initializes the application and creates a window.
 func main() {
+	// Dev builds read a gitignored .env for SHEETTRACER_GOOGLE_*; prod builds no-op.
+	oauth.LoadDotEnv()
+
 	confDir, err := os.UserConfigDir()
 	if err != nil {
 		panic(err)
@@ -31,6 +37,12 @@ func main() {
 		panic(err)
 	}
 
+	kr, err := keyring.NewStore("SheetTracer", filepath.Join(confDir, "SheetTracer", "keyring"))
+	if err != nil {
+		panic(err)
+	}
+
+	// _ = db
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
 	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.
@@ -47,9 +59,19 @@ func main() {
 		},
 	})
 
+	oauthService := services.NewOAuthService(
+		oauth.New(clientID(), clientSecret()),
+		oauth.NewKeyringStore(kr),
+		app.Browser.OpenURL,
+		func(event string, data any) { app.Event.Emit(event, data) },
+	)
+	app.RegisterService(application.NewService(oauthService))
+
 	// Create a new window with the necessary options.
 	// 'Title' is the title of the window.
 	// 'Mac' options tailor the window when running on macOS.
+	// 'BackgroundColour' is the background colour of the window.
+	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "SheetTracer",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
@@ -71,4 +93,26 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func clientID() string {
+	if v := os.Getenv("SHEETTRACER_GOOGLE_CLIENT_ID"); v != "" {
+		return v
+	}
+	if oauth.DefaultClientID != "" {
+		return oauth.DefaultClientID
+	}
+	log.Fatal("no Google OAuth client configured: set SHEETTRACER_GOOGLE_CLIENT_ID (dev .env) or build with -tags production")
+	return ""
+}
+
+func clientSecret() string {
+	if v := os.Getenv("SHEETTRACER_GOOGLE_CLIENT_SECRET"); v != "" {
+		return v
+	}
+	if oauth.DefaultClientSecret != "" {
+		return oauth.DefaultClientSecret
+	}
+	log.Fatal("no Google OAuth client configured: set SHEETTRACER_GOOGLE_CLIENT_SECRET (dev .env) or build with -tags production")
+	return ""
 }
