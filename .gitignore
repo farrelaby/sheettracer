@@ -9,3 +9,9 @@ build/ios/xcode/overlay.json
 build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
+
+# Release OAuth credentials (gitignored; supply at prod build time)
+internal/oauth/credentials_prod.go
+
+# Local dev environment (OAuth creds for wails3 dev)
+.env

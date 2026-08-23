@@ -22,14 +22,35 @@ Both are least-privilege. We never request write access.
    - User type: **External** (for distribution). For personal/early use, External in **Testing** mode with your account on the test-user allowlist.
    - Scopes: the two above.
 4. **Credentials → Create credentials → OAuth client ID** → type **Desktop app**.
-5. Download `client_secret.json`; embed the client ID/secret into the app (see below).
+5. Download `client_secret.json`; wire the client ID/secret into the app (see "Where the credentials live" below).
 
 ## Desktop client oddity
 
 For the **Desktop app** client type the `client_secret` is not a true secret — it ships inside the distributed binary. Google treats installed apps this way by design. Consequences:
 
 - Don't try to hide the secret; do keep **scopes read-only** so the blast radius of exposure is minimal.
-- Never let user *tokens* leak — those are per-user and sensitive, stored locally in SQLite (`settings` table).
+- Never let user *tokens* leak — those are per-user and sensitive, stored in the **OS keyring** (`internal/keyring`), never in the SQLite database.
+
+## Where the credentials live
+
+`clientID()` / `clientSecret()` in `main.go` resolve credentials in this order:
+
+1. **Environment variable** `SHEETTRACER_GOOGLE_CLIENT_ID` / `SHEETTRACER_GOOGLE_CLIENT_SECRET` (ops/test override).
+2. **Embedded default** `oauth.DefaultClientID` / `oauth.DefaultClientSecret`.
+
+If neither is set, the app exits at startup.
+
+- **Dev**: copy `.env.example` to a gitignored `.env` and fill in the values. Dev binaries load it via godotenv (`internal/oauth/dotenv.go`, no shell export needed); it never overrides already-exported vars. Production binaries replace this with a hard no-op (`dotenv_prod.go`) — a stray local `.env` cannot redirect release credentials.
+- **Local release build**: create `internal/oauth/credentials_prod.go` (gitignored; template in `credentials_prod.go.example`) with the real values, then run `wails3 task build`. The wails3 pipeline passes **`-tags production`** on every platform, which swaps in the credential file (`//go:build production`) and drops the empty dev defaults. Forgetting the file fails the build loudly with `undefined: oauth.DefaultClientID`.
+- **CI (GitHub Actions)**: store repo secrets `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`; `.github/workflows/release.yml` validates the secret's charset, generates `credentials_prod.go` fresh into the ephemeral workspace, and builds per-platform. The secret never touches git or the artifact cache.
+
+> The secret being extractable from any shipped binary is expected for a Desktop client ("Desktop client oddity" above). Keeping it out of git is about repo hygiene and Google's leaked-client scanning — not end-user security, which comes from the loopback redirect URI + PKCE + consent screen.
+
+## Credential leak runbook
+
+1. Rotate immediately: Google Cloud Console → Credentials → reset the client secret (old one dies instantly), rebuild + redistribute.
+2. While unverified, keep the consent screen in **Testing** mode with an allowlist — caps blast radius to known users.
+3. Scopes stay read-only so an abused client can never write, only read what a phished user grants.
 
 ## Auth flow (loopback)
 
@@ -42,7 +63,7 @@ Desktop apps have no hosted callback, so we use the **loopback redirect** patter
 3. User signs in, approves scopes
 4. Google redirects the browser to the loopback URI with ?code=...
 5. Backend captures the code, exchanges it for tokens, closes the listener
-6. Refresh token persists in SQLite settings
+6. Refresh token persists in the **OS keyring** (`internal/keyring`, service "SheetTracer")
 ```
 
 Implementation notes:
@@ -53,8 +74,8 @@ Implementation notes:
 ## Token handling
 
 - **Access token**: short-lived (~1h), refreshed automatically by the OAuth client from the refresh token.
-- **Refresh token**: stored in `settings` under `oauth.refresh_token`. It is the long-lived credential.
-- Persist as raw JSON token payload so reserialization round-trips cleanly.
+- **Refresh token**: stored in the **OS keyring** via `internal/keyring` under `oauth.refresh_token`. It is the long-lived credential.
+- **Token payload**: persisted raw as JSON under `oauth.token` (same keyring) so reserialization round-trips cleanly.
 - **On expiry/invalid grant**: emit `auth:state` with `connected=false, status=expired`; frontend shows the reconnect view.
 
 ## App states (frontend)

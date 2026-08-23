@@ -18,7 +18,9 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 
 **Deliverables**
 - Google Cloud project + consent screen + Desktop OAuth client (see `docs/GOOGLE_OAUTH.md`).
-- `internal/oauth/`: loopback server, PKCE code exchange, token refresh, `settings` persistence.
+- `internal/oauth/`: loopback server, PKCE code exchange, token refresh, keyring-backed token persistence.
+- `internal/db`: bootstrap — connection (WAL + pragmas), `user_version` migrations, `settings` KV repo.
+- `internal/keyring`: OS-keyring token store (`oauth.refresh_token` / `oauth.token`) with file-backend fallback.
 - `OAuthService` with `Connect()`, `Status()`, `Disconnect()`.
 - Frontend `OAuthStatus.svelte` with all four states.
 - `auth:state` event.
@@ -29,7 +31,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 
 **Deliverables**
 - `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `permissions(id,type,role)`).
-- `internal/db/`: migrations (incl. `spreadsheets.visibility`), connection (WAL), `spreadsheets`/`sheets`/`settings` repositories.
+- `internal/db/`: `spreadsheets`/`sheets`/`imports` repositories (db bootstrap + migrations landed in Milestone 1).
 - `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility`, dedup on `google_id`.
 - `AddSheet.svelte` (404 error state) + `SpreadsheetList.svelte` (visibility icons).
 
