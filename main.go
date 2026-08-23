@@ -3,6 +3,10 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
+	"path/filepath"
+
+	database "sheettracer/internal/db"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -17,6 +21,15 @@ var assets embed.FS
 
 // main function serves as the application's entry point. It initializes the application and creates a window.
 func main() {
+	confDir, err := os.UserConfigDir()
+	if err != nil {
+		panic(err)
+	}
+
+	path := filepath.Join(confDir, "SheetTracer", "sheetTracer.db")
+	if _, err = database.Open(path); err != nil {
+		panic(err)
+	}
 
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
@@ -37,8 +50,6 @@ func main() {
 	// Create a new window with the necessary options.
 	// 'Title' is the title of the window.
 	// 'Mac' options tailor the window when running on macOS.
-	// 'BackgroundColour' is the background colour of the window.
-	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "SheetTracer",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
@@ -54,7 +65,7 @@ func main() {
 	})
 
 	// Run the application. This blocks until the application has been exited.
-	err := app.Run()
+	err = app.Run()
 
 	// If an error occurred while running the application, log it and exit.
 	if err != nil {

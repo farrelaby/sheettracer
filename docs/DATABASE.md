@@ -13,7 +13,9 @@ SQLite, opened via `modernc.org/sqlite` (pure Go, no CGO). The DB lives in the O
 - WAL mode (`PRAGMA journal_mode=WAL`)
 - `busy_timeout` for single-writer contention
 - `foreign_keys = ON`
+- `synchronous = NORMAL` (durability tradeoff is fine — graphs can be re-scanned)
 - One writer connection for merges; read-only connections for parallel reads
+- File perms: data dir created `0700`, db file `chmod 0600` after opening — the only user who can read the DB is the owning OS user
 
 ## Schema
 
@@ -82,7 +84,8 @@ CREATE TABLE scan_runs (
     error          TEXT
 );
 
--- Key/value store: OAuth token, preferences, last app state
+-- Key/value store: non-secret preferences and last app state.
+-- Secrets (the OAuth refresh token) live in the OS keyring — see "Secrets".
 CREATE TABLE settings (
     k TEXT PRIMARY KEY,
     v TEXT NOT NULL,
@@ -117,9 +120,27 @@ A scan merge is the only writer during a run:
 
 ## Migrations
 
-- Versioned SQL migrations, applied in order at startup.
-- Keep them in `internal/db/migrations/`, each file `NNN_description.sql`.
-- A `schema_version` row (or SQLite `PRAGMA user_version`) tracks the applied migration.
+Hand-rolled runner in `internal/db/migrate.go` (no framework):
+
+- Migration files live in `internal/db/migrations/`, named `NNNN_description.sql` (`0001_init.sql`), embedded via `embed.FS`.
+- The version counter is `PRAGMA user_version` — a scalar, bumped atomically in the same transaction that applies the migration, so a crash can never leave a half-applied migration.
+- Applied at startup, **forward-only and up-only** (no down migrations): the rollback path is the backup below, not a down migration.
+- **Safety guard:** if the on-disk `user_version` is *higher* than this binary knows, the app refuses to start ("created by a newer version of SheetTracer") rather than risk an old build writing to an unknown schema.
+- **Auto-backup:** before the first pending migration, a copy is written via `VACUUM INTO` to `<db>.pre-upgrade.db` (replacing the previous backup). Rollback = stop the app, restore that file.
+
+### Migration discipline (no data loss)
+
+- **Additive changes only**: new tables, `ADD COLUMN`, new indexes never touch existing rows — safe by construction.
+- Semantic changes: add the new column → backfill → drop the old one. Never mutate meaning in place. (`ALTER TABLE DROP/RENAME COLUMN` are available on the modern SQLite core modernc ships, but prefer additive + backfill.)
+- Structural changes (PK/constraint edits): table-rewrite pattern (`CREATE TABLE new; INSERT SELECT; DROP old; RENAME`) inside the migration tx. `foreign_keys` is per-connection, so handle it explicitly during rewrites.
+
+## Secrets
+
+The OAuth refresh token is the only secret the app stores, and it does **not** live in SQLite — it goes to the **OS keyring** via `internal/keyring` (macOS Keychain, Windows Credential Manager, Linux Secret Service), item keys `oauth.refresh_token` / `oauth.token`. `settings` holds only non-secret preferences and last app state.
+
+- Keyring dependency: `99designs/keyring`. Its macOS backend (Keychain) uses cgo; Linux (Secret Service, via DBus) and Windows (wincred) do not. This is the one place the app needs cgo on macOS, and it does not affect the CGO-free sqlite decision.
+- **Fallback:** if the system keyring is unreachable (headless Linux, CI, locked keyring), `internal/keyring` falls back to an unencrypted file backend (`FilePasswordFunc` static passphrase that ships in the binary — obfuscation only, never a trusted secret store). `Store.UseFallback()` reports the degraded mode so the UI can warn.
+- The data directory is created `0700` and the db file `0600` so even the SQLite side is only readable by the owning user.
 
 ## Backup
 
