@@ -57,7 +57,10 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 - `GraphLegend.svelte` (incl. visibility icons); visibility icon overlays on nodes.
 - `GraphService.Graph()` returns `GraphPayload` with `visibility` per node (`docs/FRONTEND.md`).
 
-**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; every node shows its visibility icon; click shows detail (incl. `unknown`/no-access state); leaf offers "Track this sheet"; layout re-runs on update.
+- **View menu**: Toggle Sidebar (`CmdOrCtrl+B`), Toggle Inspector (`CmdOrCtrl+Shift+I`), separator, Zoom In (`CmdOrCtrl+=`), Zoom Out (`CmdOrCtrl+-`), Reset Zoom (`CmdOrCtrl+0`). Menu items emit Wails events; `App.svelte` and `GraphCanvas.svelte` listen and react.
+- **Help menu**: Documentation (opens `docs/` URL or local path via `app.Browser.OpenURL`), Report Issue (opens GitHub issues page).
+
+**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; every node shows its visibility icon; click shows detail (incl. `unknown`/no-access state); leaf offers "Track this sheet"; layout re-runs on update; View menu toggles sidebar/inspector and controls zoom; keyboard shortcuts work; Help menu links open in browser.
 
 ## Milestone 5 — Cache revalidation + scan triggers
 
