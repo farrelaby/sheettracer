@@ -7,5 +7,6 @@ export {
 };
 
 export type {
+    AccountInfo,
     AuthState
 } from "./models.js";

@@ -2,10 +2,14 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"sheettracer/internal/oauth"
+
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
 )
 
 // AuthState is mirrored to the frontend via the "auth:state" event.
@@ -88,4 +92,38 @@ func (s *OAuthService) Disconnect() error {
 	}
 	s.emit(authStateEvent, AuthState{Status: "disconnected"})
 	return nil
+}
+
+type AccountInfo struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+// Returns user account info (name, email)
+func (s *OAuthService) Account() (AccountInfo, error) {
+	tok, err := s.store.Get()
+	if err != nil {
+		return AccountInfo{}, err
+	}
+	if tok == nil {
+		return AccountInfo{}, fmt.Errorf("No token found")
+	}
+
+	src := s.client.Source(context.Background(), tok, s.store)
+
+	driveService, err := drive.NewService(context.Background(), option.WithTokenSource(src))
+	if err != nil {
+		return AccountInfo{}, fmt.Errorf("[drive Service init]: %w",err)
+	}
+	about, err := driveService.About.Get().Fields("user").Do()
+	if err != nil {
+
+		return AccountInfo{}, fmt.Errorf("[about.get]: %w",err)
+	}
+
+	return AccountInfo{
+		Name:  about.User.DisplayName,
+		Email: about.User.EmailAddress,
+	}, nil
+
 }

@@ -16,6 +16,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * Returns user account info (name, email)
+ */
+export function Account(): $CancellablePromise<$models.AccountInfo> {
+    return $Call.ByID(429884205);
+}
+
+/**
  * Connect starts the browser consent flow. It returns immediately; the
  * outcome arrives through the "auth:state" event. Concurrent calls while a
  * flow is in progress are ignored and just echo the connecting state.

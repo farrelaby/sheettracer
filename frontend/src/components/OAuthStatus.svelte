@@ -1,14 +1,19 @@
 <script lang="ts">
   import { Events } from "@wailsio/runtime";
-  import { OAuthService } from "../../bindings/sheettracer/internal/services";
+  import {
+    OAuthService,
+    type AccountInfo,
+  } from "../../bindings/sheettracer/internal/services";
   import type { OAuthState } from "../lib/authstate";
 
   const initial: OAuthState = { connected: false, status: "disconnected" };
   let authState = $state<OAuthState>(initial);
   let busy = $state(false);
 
+  let accountInfoState = $state<AccountInfo | null>(null);
+
   $effect(() => {
-    const off = Events.On("auth:state", (ev: any) => {
+    const off = Events.On("auth:state", (ev) => {
       if (ev?.data) {
         authState = ev.data;
         busy = false;
@@ -23,6 +28,16 @@
         if (s) authState = s;
       })
       .catch(() => {});
+  });
+
+  $effect(() => {
+    if (authState.status === "connected") {
+      OAuthService.Account().then((v) => {
+        if (v) accountInfoState = { name: v.name, email: v.email };
+      });
+    } else {
+      accountInfoState = null;
+    }
   });
 
   async function connect() {
@@ -50,13 +65,20 @@
     G
   </div>
   <div class="min-w-0 flex-1">
-    <p class="truncate text-sm text-slate-200">Google account</p>
+    {#if accountInfoState != null}
+      <p class="truncate text-sm text-slate-200">{accountInfoState.name}</p>
+      <p class="text-[0.6rem] text-gray-400 max-w-lg overflow-x-hidden">
+        {accountInfoState.email}
+      </p>
+    {/if}
     {#if authState.status === "connected"}
       <p class="text-xs text-emerald-400">Connected</p>
     {:else if busy || authState.status === "connecting"}
       <p class="text-xs text-amber-400">Waiting for approval…</p>
     {:else if authState.status === "expired"}
-      <p class="text-xs text-rose-400">{authState.message || "Session expired"}</p>
+      <p class="text-xs text-rose-400">
+        {authState.message || "Session expired"}
+      </p>
     {:else}
       <p class="text-xs text-slate-500">Not connected</p>
     {/if}
