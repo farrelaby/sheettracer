@@ -4,6 +4,8 @@
   import type { SheetRow } from "./demo-data";
   import { fly } from "svelte/transition";
   import { selection, type Selection } from "../lib/selection.svelte";
+  import OAuthStatus from "./OAuthStatus.svelte";
+  import { OAuthService } from "../../bindings/sheettracer/internal/services";
 
   interface Props {
     onClose: () => void;
@@ -26,7 +28,6 @@
   let query = $state("");
   let linkInput = $state("");
   let addError = $state("");
-  let connected = $state(true);
   let settingsOpen = $state(false);
   let rescanOnLaunch = $state(true);
 
@@ -256,27 +257,7 @@
     </div>
   </div>
 
-  <div
-    class="mx-2 mb-2 flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2.5"
-  >
-    <div
-      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs font-semibold text-purple-300"
-    >
-      AN
-    </div>
-    <div class="min-w-0 flex-1">
-      <p class="truncate text-sm text-slate-200">ana@sheets.example</p>
-      <p class="text-xs text-emerald-400">
-        {connected ? "Connected" : "Disconnected"}
-      </p>
-    </div>
-    <button
-      onclick={() => (connected = !connected)}
-      class="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
-    >
-      {connected ? "Disconnect" : "Connect"}
-    </button>
-  </div>
+  <OAuthStatus />
 
   <div class="border-t border-slate-800 p-2">
     <button
@@ -313,7 +294,7 @@
           />
         </label>
         <button
-          onclick={() => (connected = false)}
+          onclick={() => { OAuthService.Connect(); }}
           class="w-full rounded px-2 py-1 text-left text-xs text-slate-500 hover:bg-slate-800 hover:text-slate-300"
           >Reconnect Google account</button
         >
