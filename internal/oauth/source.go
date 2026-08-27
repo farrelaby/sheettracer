@@ -8,8 +8,9 @@ import (
 // round-trips through the keyring. Valid tokens short-circuit inside the
 // library's ReuseTokenSource, so this only writes on an actual refresh.
 type persistingSource struct {
-	src   oauth2.TokenSource
-	store TokenStore
+	src       oauth2.TokenSource
+	store     TokenStore
+	lastSaved *oauth2.Token
 }
 
 func (p *persistingSource) Token() (*oauth2.Token, error) {
@@ -17,8 +18,11 @@ func (p *persistingSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := p.store.Save(tok); err != nil {
-		return nil, err
+	if p.lastSaved == nil || tok.AccessToken != p.lastSaved.AccessToken {
+		if err := p.store.Save(tok); err != nil {
+			return nil, err
+		}
+		p.lastSaved = tok
 	}
 	return tok, nil
 }

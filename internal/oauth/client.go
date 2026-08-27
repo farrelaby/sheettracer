@@ -35,5 +35,5 @@ func New(clientID, clientSecret string) *Client {
 // short-circuit inside the library's ReuseTokenSource, so this only writes
 // on an actual refresh.
 func (c *Client) Source(ctx context.Context, tok *oauth2.Token, store TokenStore) oauth2.TokenSource {
-	return &persistingSource{src: c.config.TokenSource(ctx, tok), store: store}
+	return &persistingSource{src: c.config.TokenSource(ctx, tok), store: store, lastSaved: tok}
 }
