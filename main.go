@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	database "sheettracer/internal/db"
 	"sheettracer/internal/keyring"
@@ -67,6 +68,9 @@ func main() {
 	)
 	app.RegisterService(application.NewService(oauthService))
 
+	menu := createMenu(app)
+	app.Menu.Set(menu)
+
 	// Create a new window with the necessary options.
 	// 'Title' is the title of the window.
 	// 'Mac' options tailor the window when running on macOS.
@@ -93,6 +97,38 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func createMenu(app *application.App) *application.Menu {
+	menu := app.NewMenu()
+
+	if runtime.GOOS == "darwin" {
+		menu.AddRole(application.AppMenu)
+	}
+
+	if runtime.GOOS != "darwin" {
+		fileMenu := menu.AddSubmenu("File")
+		fileMenu.Add("Exit").SetAccelerator("Alt+F4").OnClick(func(ctx *application.Context) {
+			app.Quit()
+		})
+	}
+
+	helpMenu := menu.AddSubmenu("Help")
+	helpMenu.Add("Documentation").OnClick(func(ctx *application.Context) {
+		app.Browser.OpenURL("https://github.com/farrelaby/sheettracer/tree/main/docs")
+	})
+	helpMenu.Add("Report Issue").OnClick(func(ctx *application.Context) {
+		app.Browser.OpenURL("https://github.com/farrelaby/sheettracer/issues")
+	})
+	helpMenu.AddSeparator()
+	helpMenu.Add("About SheetTracer").OnClick(func(ctx *application.Context) {
+		app.Dialog.Info().
+			SetTitle("About SheetTracer").
+			SetMessage("SheetTracer\n\nMap IMPORTRANGE dependencies across your Google Sheets.").
+			Show()
+	})
+
+	return menu
 }
 
 func clientID() string {
