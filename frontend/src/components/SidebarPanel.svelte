@@ -1,11 +1,14 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import VisibilityIcon from "./VisibilityIcon.svelte";
-  import { seedSheets } from "./demo-data";
-  import type { SheetRow } from "./demo-data";
   import { fly } from "svelte/transition";
   import { selection, type Selection } from "../lib/selection.svelte";
   import OAuthStatus from "./OAuthStatus.svelte";
-  import { OAuthService } from "../../bindings/sheettracer/internal/services";
+  import {
+    OAuthService,
+    SheetsService,
+  } from "../../bindings/sheettracer/internal/services";
+  import type { Spreadsheet } from "../../bindings/sheettracer/internal/db/models";
 
   interface Props {
     onClose: () => void;
@@ -24,18 +27,30 @@
   let width = $state(initialWidth());
   let dragging = $state(false);
 
-  let sheets = $state<SheetRow[]>(seedSheets);
+  let sheets = $state<Spreadsheet[]>([]);
+  let loading = $state(true);
   let query = $state("");
   let linkInput = $state("");
   let addError = $state("");
+  let adding = $state(false);
   let settingsOpen = $state(false);
   let rescanOnLaunch = $state(true);
 
   const filtered = $derived(
     sheets.filter((s) =>
-      s.title.toLowerCase().includes(query.trim().toLowerCase()),
+      s.Title.toLowerCase().includes(query.trim().toLowerCase()),
     ),
   );
+
+  onMount(async () => {
+    try {
+      sheets = await SheetsService.List();
+    } catch (e) {
+      console.error("Failed to load spreadsheets:", e);
+    } finally {
+      loading = false;
+    }
+  });
 
   function clampWidth(w: number): number {
     return Math.min(MAX, Math.max(MIN, w));
@@ -60,58 +75,73 @@
     selection.set(s);
   }
 
-  function addSheet() {
+  async function addSheet() {
     const value = linkInput.trim();
     if (!value) return;
     if (!value.startsWith("http")) {
       addError =
-        "Enter a Google Sheets link, e.g. https://docs.google.com/spreadsheets/d/…";
-      return;
-    }
-    if (value.includes("denied")) {
-      addError =
-        "Could not access this sheet — no access, or it doesn't exist.";
+        "Enter a Google Sheets link, e.g. https://docs.google.com/spreadsheets/d/\u2026";
       return;
     }
     addError = "";
-    sheets = [
-      {
-        id: `new-${Date.now()}`,
-        title: "Just added sheet",
-        visibility: "unknown",
-        lastScan: "never",
-        status: "ok",
-      },
-      ...sheets,
-    ];
-    linkInput = "";
+    adding = true;
+    try {
+      const sp = await SheetsService.Add(value, "");
+      if (sp) {
+        sheets = [sp, ...sheets];
+      }
+      linkInput = "";
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      if (msg.includes("no access") || msg.includes("not found") || msg.includes("404")) {
+        addError = "Could not access this sheet \u2014 no access, or it doesn\u2019t exist.";
+      } else {
+        addError = msg || "Failed to add spreadsheet.";
+      }
+    } finally {
+      adding = false;
+    }
   }
 
-  function rescan(id: string) {
-    sheets = sheets.map((s) =>
-      s.id === id ? { ...s, status: "scanning" } : s,
-    );
-    setTimeout(() => {
-      sheets = sheets.map((s) =>
-        s.id === id ? { ...s, status: "ok", lastScan: "just now" } : s,
-      );
-    }, 1200);
+  async function remove(id: number) {
+    try {
+      await SheetsService.Remove(id);
+      sheets = sheets.filter((s) => s.ID !== id);
+    } catch (e) {
+      console.error("Failed to remove:", e);
+    }
   }
 
-  function remove(id: string) {
-    sheets = sheets.filter((s) => s.id !== id);
-  }
-
-  function statusDot(status: SheetRow["status"]): string {
-    switch (status) {
-      case "scanning":
-        return "bg-amber-400 animate-pulse";
-      case "error":
-        return "bg-red-400";
-      case "partial":
-        return "bg-amber-400";
+  function visibilityLabel(v: string): string {
+    switch (v) {
+      case "public":
+        return "Public";
+      case "link-only":
+        return "Link-only";
+      case "private":
+        return "Private";
       default:
-        return "bg-emerald-400";
+        return "Unknown";
+    }
+  }
+
+  function statusDot(s: Spreadsheet): string {
+    if (!s.LastScanAt) return "bg-slate-500";
+    return "bg-emerald-400";
+  }
+
+  function lastScanText(s: Spreadsheet): string {
+    if (!s.LastScanAt) return "never";
+    try {
+      const d = new Date(s.LastScanAt);
+      const now = new Date();
+      const diff = now.getTime() - d.getTime();
+      if (diff < 60_000) return "just now";
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
+      return `${Math.floor(diff / 86_400_000)} d ago`;
+    } catch {
+      return "unknown";
     }
   }
 </script>
@@ -171,91 +201,77 @@
   >
     <input
       bind:value={linkInput}
-      placeholder="Paste a Google Sheets link…"
-      class="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-purple-500"
+      placeholder="Paste a Google Sheets link\u2026"
+      disabled={adding}
+      class="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-purple-500 disabled:opacity-50"
     />
     {#if addError}<p class="mt-1.5 text-xs text-red-400">{addError}</p>{/if}
     <button
       type="submit"
-      disabled={!linkInput.trim()}
+      disabled={!linkInput.trim() || adding}
       class="mt-2 w-full rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40"
-      >Add spreadsheet</button
+      >{adding ? "Adding\u2026" : "Add spreadsheet"}</button
     >
   </form>
 
   <input
     bind:value={query}
-    placeholder="Search sheets…"
+    placeholder="Search sheets\u2026"
     class="mx-4 mb-2 w-[calc(100%-2rem)] rounded-md border border-slate-800 bg-slate-950/50 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-slate-600"
   />
 
   <nav class="min-h-0 flex-1 overflow-y-auto px-2 py-4">
-    {#if filtered.length === 0}
+    {#if loading}
+      <p class="px-3 py-6 text-center text-xs text-slate-600">
+        Loading\u2026
+      </p>
+    {:else if filtered.length === 0}
       <p class="px-3 py-6 text-center text-xs text-slate-600">
         No tracked sheets yet.
       </p>
     {:else}
-      {#each filtered as s (s.id)}
+      {#each filtered as s (s.ID)}
         <div
           role="button"
           tabindex="0"
-          onclick={() => onSelect({ type: "node", id: s.id })}
+          onclick={() => onSelect({ type: "node", id: String(s.ID) })}
           onkeydown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              onSelect({ type: "node", id: s.id });
+              onSelect({ type: "node", id: String(s.ID) });
             }
           }}
           class={[
             "group mb-1 flex w-full cursor-pointer items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-slate-800 hover:bg-slate-800/40 transition-all",
-            ,
-            selection.value && selection.value.id === s.id && "bg-slate-800",
+            selection.value &&
+              selection.value.id === String(s.ID) &&
+              "bg-slate-800",
           ]}
         >
-          <VisibilityIcon visibility={s.visibility} />
+          <VisibilityIcon visibility={s.Visibility as any} />
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm text-slate-200">{s.title}</p>
+            <p class="truncate text-sm text-slate-200">{s.Title}</p>
             <p class="flex items-center gap-1.5 text-xs text-slate-500">
               <span
-                class={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(s.status)}`}
+                class={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(s)}`}
               ></span>
-              {s.status === "scanning" ? "scanning…" : s.lastScan}
+              {lastScanText(s)}
             </p>
           </div>
           <button
             type="button"
             onclick={(e) => {
               e.stopPropagation();
-              rescan(s.id);
-            }}
-            title="Rescan"
-            class="rounded p-1 text-slate-500 opacity-0 hover:bg-slate-700 hover:text-green-300 group-hover:opacity-100 cursor-pointer"
-            >⟳</button
-          >
-          <button
-            type="button"
-            onclick={(e) => {
-              e.stopPropagation();
-              remove(s.id);
+              remove(s.ID);
             }}
             title="Remove"
             class="rounded p-1 px-2 font-extrabold text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
-            >✕</button
+            >\u2715</button
           >
         </div>
       {/each}
     {/if}
   </nav>
-
-  <div class="mx-4 mb-3">
-    <div class="mb-1 flex items-center justify-between text-xs text-slate-500">
-      <span>Scanning 2 of 7 sheets…</span>
-      <span>28%</span>
-    </div>
-    <div class="h-1 overflow-hidden rounded-full bg-slate-800">
-      <div class="h-full w-[28%] rounded-full bg-purple-500"></div>
-    </div>
-  </div>
 
   <OAuthStatus />
 
@@ -278,7 +294,7 @@
       >
       Settings
       <span class="ml-auto text-xs text-slate-600"
-        >{settingsOpen ? "▾" : "▸"}</span
+        >{settingsOpen ? "\u25BE" : "\u25B8"}</span
       >
     </button>
     {#if settingsOpen}
@@ -294,7 +310,9 @@
           />
         </label>
         <button
-          onclick={() => { OAuthService.Connect(); }}
+          onclick={() => {
+            OAuthService.Connect();
+          }}
           class="w-full rounded px-2 py-1 text-left text-xs text-slate-500 hover:bg-slate-800 hover:text-slate-300"
           >Reconnect Google account</button
         >
