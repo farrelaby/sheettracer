@@ -30,10 +30,10 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 2 — Add spreadsheet + metadata
 
 **Deliverables**
-- `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `permissions(id,type,role)`).
-- `internal/db/`: `spreadsheets`/`sheets`/`edges` repositories (db bootstrap + migrations landed in Milestone 1).
-- `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility`, dedup on `google_id`.
-- `AddSheet.svelte` (404 error state) + `SpreadsheetList.svelte` (visibility icons).
+- `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `shared`, `capabilities`).
+- `internal/db/`: `SpreadsheetRepo` (UpsertByGoogleID, GetByGoogleID, ListTracked, Delete) + `SheetRepo` (UpsertAll, ListBySpreadheetsqlx-backed repositories.
+- `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility` (via `shared` + `capabilities`), dedup on `google_id`.
+- `SidebarPanel.svelte`: calls `SheetsService.List()` on mount, `Add()` with 404 error state, `Remove()` to delete.
 
 **Acceptance**: paste a link → workbook appears in the list with title/tabs + visibility icon; a link to a sheet you can't access shows "no access / not found"; adding the same link twice dedups.
 

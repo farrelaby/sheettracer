@@ -181,7 +181,7 @@ CREATE TABLE settings (
 ## Graph model
 
 - **Node** = a row in `spreadsheets` (file-level granularity; tabs live in `sheets` as metadata).
-- **Node visibility** (`spreadsheets.visibility`) is derived from Drive permissions during `files.get` (`type='anyone'` → `public`, `type='anyoneWithLink'` → `link-only`, otherwise `private`). An external target we can't access resolves to `unknown` (Drive returns 404 `notFound` for both "no access" and "doesn't exist" — see `docs/SCANNING.md`).
+- **Node visibility** (`spreadsheets.visibility`) is derived from `drive.files.get` using `shared` + `capabilities` fields (`shared=false` → `private`, `shared=true && canEdit=false` → `link-only`, `shared=true && canEdit=true` → `public`). An external target we can't access resolves to `unknown` (Drive returns 404 `notFound` for both "no access" and "doesn't exist" — see `docs/SCANNING.md`).
 - **Edge** = one or more rows in `edges` sharing the same `(source_spreadsheet, target_google_id)`. Each row is a single IMPORTRANGE formula with its cell location.
 - **Edge width** (drives visual thickness in the graph UI) = count of formulas per source-target pair:
 
@@ -212,7 +212,7 @@ A scan merge is the only writer during a run:
 1. **Delete** all edges belonging to scanned workbooks (clear the slate).
 2. **Insert** each extracted edge — fresh `first_seen_at`, `last_seen_at = CURRENT_TIMESTAMP`.
 3. Rewrite `scan_cache` blobs for changed tabs; drop unchanged entries.
-4. Update `spreadsheets.version` / `modified_time` / `visibility` (permissions from the same `files.get`).
+4. Update `spreadsheets.version` / `modified_time` / `visibility` (from the same `files.get` using `shared` + `capabilities`).
 
 > Note: sharing changes don't reliably bump the Drive `version`, so `visibility` is refreshed on every scan (preflight always re-reads `files.get`), not pushed instantly.
 

@@ -84,7 +84,7 @@ Derived from `drive.files.get` using `shared` + `capabilities` fields:
 Tracked sheets' IMPORTRANGE targets that the user hasn't added appear as leaf nodes. During the scan merge:
 
 1. Collect target spreadsheet ids from extracted edges that aren't already in `spreadsheets`.
-2. Best-effort `files.get` each (same field mask: `name` + `permissions`) to resolve the **title** and **visibility** for display. Cache the result in `scan_cache` so each new target costs ~1 call, not 1-per-scan.
+2. Best-effort `files.get` each (same field mask: `shared`, `capabilities`) to resolve the **title** and **visibility** for display. Cache the result in `scan_cache` so each new target costs ~1 call, not 1-per-scan.
 3. On 404 → store as `unknown` (no title, "not accessible / not found" state).
 
 Rules:
