@@ -1,11 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func openTestDB(t *testing.T) (path string) {
@@ -19,7 +20,7 @@ func openTestDB(t *testing.T) (path string) {
 	return path
 }
 
-func mustReopen(t *testing.T, path string) *sql.DB {
+func mustReopen(t *testing.T, path string) *sqlx.DB {
 	t.Helper()
 	handle, err := Open(path)
 	if err != nil {

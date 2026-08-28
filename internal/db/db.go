@@ -1,11 +1,11 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/jmoiron/sqlx"
 	_ "turso.tech/database/tursogo"
 )
 
@@ -21,14 +21,14 @@ const backupSuffix = ".pre-upgrade.db"
 //
 // The data directory is created 0700 and the database file is chmod'ed 0600 so
 // the credentials SheetTracer persists stay private to the owning user.
-func Open(path string) (*sql.DB, error) {
+func Open(path string) (*sqlx.DB, error) {
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, fmt.Errorf("db: create data dir: %w", err)
 		}
 	}
 
-	handle, err := sql.Open("turso", path)
+	handle, err := sqlx.Open("turso", path)
 	if err != nil {
 		return nil, fmt.Errorf("db: open %s: %w", path, err)
 	}
@@ -43,7 +43,7 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("db: ping %s: %w", path, err)
 	}
 
-	if err := migrate(handle, path); err != nil {
+	if err := migrate(handle.DB, path); err != nil {
 		handle.Close()
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func Open(path string) (*sql.DB, error) {
 // setPragmas configures the connection for WAL mode, foreign keys, and
 // performance-tuned synchronous writes. Each PRAGMA is executed on the
 // connection individually (foreign_keys is per-connection by design).
-func setPragmas(handle *sql.DB) error {
+func setPragmas(handle *sqlx.DB) error {
 	pragmas := []string{
 		"PRAGMA busy_timeout = 5000",
 		"PRAGMA journal_mode = WAL",
