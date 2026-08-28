@@ -34,7 +34,8 @@ func main() {
 	}
 
 	path := filepath.Join(confDir, "SheetTracer", "sheetTracer.db")
-	if _, err = database.Open(path); err != nil {
+	db, err := database.Open(path)
+	if err != nil {
 		panic(err)
 	}
 
@@ -42,8 +43,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// _ = db
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
 	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.
@@ -67,6 +66,14 @@ func main() {
 		func(event string, data any) { app.Event.Emit(event, data) },
 	)
 	app.RegisterService(application.NewService(oauthService))
+
+	sheetsService := services.NewSheetsService(
+		oauth.New(clientID(), clientSecret()),
+		oauth.NewKeyringStore(kr),
+		database.NewSpreadsheetRepo(db),
+		database.NewSheetRepo(db),
+	)
+	app.RegisterService(application.NewService(sheetsService))
 
 	menu := createMenu(app)
 	app.Menu.Set(menu)
