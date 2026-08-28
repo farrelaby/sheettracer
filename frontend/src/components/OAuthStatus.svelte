@@ -33,7 +33,12 @@
   $effect(() => {
     if (authState.status === "connected") {
       OAuthService.Account().then((v) => {
-        if (v) accountInfoState = { name: v.name, email: v.email };
+        if (v)
+          accountInfoState = {
+            name: v.name,
+            email: v.email,
+            photo_url: v.photo_url,
+          };
       });
     } else {
       accountInfoState = null;
@@ -59,13 +64,20 @@
 <div
   class="mx-2 mb-2 flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2.5"
 >
-  <div
+  <!-- <div
     class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-500/20 text-xs font-semibold text-purple-300"
   >
     G
-  </div>
+  </div> -->
+  {#if accountInfoState}
+    <img
+      src={accountInfoState.photo_url}
+      alt="G"
+      class="h-8 w-8 shrink-0 rounded-full object-cover"
+    />
+  {/if}
   <div class="min-w-0 flex-1">
-    {#if accountInfoState != null}
+    {#if accountInfoState}
       <p class="truncate text-sm text-slate-200">{accountInfoState.name}</p>
       <p class="text-[0.6rem] text-gray-400 max-w-lg overflow-x-hidden">
         {accountInfoState.email}

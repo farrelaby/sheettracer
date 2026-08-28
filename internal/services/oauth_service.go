@@ -95,8 +95,9 @@ func (s *OAuthService) Disconnect() error {
 }
 
 type AccountInfo struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	PhotoUrl string `json:"photo_url"`
 }
 
 // Returns user account info (name, email)
@@ -113,17 +114,18 @@ func (s *OAuthService) Account() (AccountInfo, error) {
 
 	driveService, err := drive.NewService(context.Background(), option.WithTokenSource(src))
 	if err != nil {
-		return AccountInfo{}, fmt.Errorf("[drive Service init]: %w",err)
+		return AccountInfo{}, fmt.Errorf("[drive Service init]: %w", err)
 	}
 	about, err := driveService.About.Get().Fields("user").Do()
 	if err != nil {
 
-		return AccountInfo{}, fmt.Errorf("[about.get]: %w",err)
+		return AccountInfo{}, fmt.Errorf("[about.get]: %w", err)
 	}
 
 	return AccountInfo{
 		Name:  about.User.DisplayName,
 		Email: about.User.EmailAddress,
+		PhotoUrl: about.User.PhotoLink,
 	}, nil
 
 }
