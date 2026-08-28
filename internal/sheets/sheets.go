@@ -49,9 +49,9 @@ func ParseID(raw string) (string, error) {
 
 // Tab represents a sheet tab within a spreadsheet.
 type Tab struct {
-	TabID int64
-	Title string
-	Idx   int
+	SheetID int64
+	Title   string
+	Idx     int
 }
 
 // Metadata holds the result of spreadsheets.get + drive.files.get.
@@ -103,15 +103,16 @@ func (c *Client) FetchMetadata(ctx context.Context, spreadsheetID string) (*Meta
 	meta.Title = sp.Properties.Title
 	for i, sh := range sp.Sheets {
 		meta.Tabs = append(meta.Tabs, Tab{
-			TabID: sh.Properties.SheetId,
-			Title: sh.Properties.Title,
-			Idx:   i,
+			SheetID: sh.Properties.SheetId,
+			Title:   sh.Properties.Title,
+			Idx:     i,
 		})
 	}
 
-	// drive.files.get — version, modifiedTime, permissions.
+	// drive.files.get — version, modifiedTime, shared, capabilities.
 	f, err := c.driveSvc.Files.Get(spreadsheetID).
-		Fields("version,modifiedTime,permissions(id,type,role)").
+		SupportsAllDrives(true).
+		Fields("version,modifiedTime,shared,capabilities(canComment,canEdit)").
 		Context(ctx).
 		Do()
 	if err != nil {
@@ -122,22 +123,20 @@ func (c *Client) FetchMetadata(ctx context.Context, spreadsheetID string) (*Meta
 	}
 	meta.Version = fmt.Sprintf("%d", f.Version)
 	meta.ModifiedTime = f.ModifiedTime
-	meta.Visibility = classifyVisibility(f.Permissions)
+	meta.Visibility = classifyVisibility(f.Shared, f.Capabilities.CanEdit)
 
 	return meta, nil
 }
 
-// classifyVisibility derives visibility from Drive permissions.
-func classifyVisibility(perms []*drive.Permission) string {
-	for _, p := range perms {
-		switch p.Type {
-		case "anyone":
-			return "public"
-		case "anyoneWithLink":
-			return "link-only"
-		}
+// classifyVisibility derives visibility from shared + capabilities.
+func classifyVisibility(shared bool, canEdit bool) string {
+	if !shared {
+		return "private"
 	}
-	return "private"
+	if canEdit {
+		return "public"
+	}
+	return "link-only"
 }
 
 // isNotFound checks if an error is a Google API 404.

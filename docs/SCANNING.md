@@ -68,13 +68,13 @@ Notes:
 
 ## Visibility (public vs private)
 
-Derived from the file's `permissions` list during `files.get`:
+Derived from `drive.files.get` using `shared` + `capabilities` fields:
 
 | State | Signal | Meaning |
 |---|---|---|
-| `public` | a permission with `type='anyone'` | Searchable by anyone |
-| `link-only` | `type='anyoneWithLink'` | Anyone with the link can view |
-| `private` | only `type='user'` / `'group'` / `'domain'` | Shared with specific people/orgs only |
+| `private` | `shared=false` | Only specific people have access |
+| `link-only` | `shared=true, canEdit=false` | Anyone with the link can view |
+| `public` | `shared=true, canEdit=true` | Anyone with the link can edit |
 | `unknown` | `files.get` fails | See below |
 
 **`unknown` = failed `files.get`.** Drive returns HTTP 404 `notFound` for both "no read access" and "file doesn't exist" — deliberately, so the API doesn't leak whether a file exists. The backend treats both identically; the UI shows a muted "not accessible / not found" state. A genuinely public file is always readable by any authenticated user, so a 404 reliably means private-to-you or nonexistent — safe to classify as `unknown`.
