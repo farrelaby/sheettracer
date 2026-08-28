@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "turso.tech/database/tursogo"
 )
 
 // latestSchemaVersion is the newest migration this binary understands. Bump it
@@ -17,8 +16,8 @@ const latestSchemaVersion = 1
 // backupSuffix is appended to the database path for the pre-upgrade copy.
 const backupSuffix = ".pre-upgrade.db"
 
-// Open opens (creating if needed) the SQLite database at path, applies any
-// pending migrations, and returns a ready *sql.DB.
+// Open opens (creating if needed) the Turso/libSQL database at path, applies
+// any pending migrations, and returns a ready *sql.DB.
 //
 // The data directory is created 0700 and the database file is chmod'ed 0600 so
 // the credentials SheetTracer persists stay private to the owning user.
@@ -29,10 +28,16 @@ func Open(path string) (*sql.DB, error) {
 		}
 	}
 
-	handle, err := sql.Open("sqlite", dsn(path))
+	handle, err := sql.Open("turso", path)
 	if err != nil {
 		return nil, fmt.Errorf("db: open %s: %w", path, err)
 	}
+
+	if err := setPragmas(handle); err != nil {
+		handle.Close()
+		return nil, err
+	}
+
 	if err := handle.Ping(); err != nil {
 		handle.Close()
 		return nil, fmt.Errorf("db: ping %s: %w", path, err)
@@ -51,14 +56,20 @@ func Open(path string) (*sql.DB, error) {
 	return handle, nil
 }
 
-// dsn builds a SQLite URI. Pragmas are passed as _pragma parameters so they are
-// applied to every pooled connection (PRAGMA statements executed via Exec only
-// affect the one connection they run on, and foreign_keys is per-connection).
-func dsn(path string) string {
-	escaped := strings.NewReplacer(" ", "%20", "#", "%23", "?", "%3F").Replace(path)
-	return "file:" + escaped +
-		"?_pragma=busy_timeout(5000)" +
-		"&_pragma=journal_mode(WAL)" +
-		"&_pragma=foreign_keys(ON)" +
-		"&_pragma=synchronous(NORMAL)"
+// setPragmas configures the connection for WAL mode, foreign keys, and
+// performance-tuned synchronous writes. Each PRAGMA is executed on the
+// connection individually (foreign_keys is per-connection by design).
+func setPragmas(handle *sql.DB) error {
+	pragmas := []string{
+		"PRAGMA busy_timeout = 5000",
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA synchronous = NORMAL",
+	}
+	for _, p := range pragmas {
+		if _, err := handle.Exec(p); err != nil {
+			return fmt.Errorf("db: %s: %w", p, err)
+		}
+	}
+	return nil
 }
