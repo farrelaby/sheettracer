@@ -31,7 +31,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 
 **Deliverables**
 - `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `permissions(id,type,role)`).
-- `internal/db/`: `spreadsheets`/`sheets`/`imports` repositories (db bootstrap + migrations landed in Milestone 1).
+- `internal/db/`: `spreadsheets`/`sheets`/`edges` repositories (db bootstrap + migrations landed in Milestone 1).
 - `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility`, dedup on `google_id`.
 - `AddSheet.svelte` (404 error state) + `SpreadsheetList.svelte` (visibility icons).
 
@@ -41,7 +41,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 
 **Deliverables**
 - `internal/scan/`: IMPORTRANGE extractor, chunked `values.batchGet` (FORMULA render, field-masked), worker pool + results channel + single merge writer.
-- Edge upsert/seen/purge lifecycle; `scan_cache` writes; `scan_runs` logging.
+- Edge delete/insert lifecycle; `scan_cache` writes; `scan_runs` logging.
 - Preflight refreshes `visibility` (same `files.get`); merge resolves external target titles/visibility (cached `files.get`, 404 → `unknown`).
 - `ScanService.Rescan()` and `RescanOne(id)`; `scan:progress` + `graph:updated` events.
 - Per-workbook 403 handling → `status='partial'`; `GraphPayload` nodes carry `visibility`.

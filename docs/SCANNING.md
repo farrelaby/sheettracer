@@ -10,11 +10,12 @@ The scan pipeline detects `IMPORTRANGE` dependencies across tracked spreadsheets
 =IMPORTRANGE("https://docs.google.com/spreadsheets/d/ABC123/edit#gid=0", "Sheet1!A1:C10")
 ```
 
-We only care about the **formula cells** — hence the `fields` masking below. Target data:
+We only care about the **formula cells** — hence the `fields` masking below. Per formula we extract:
 
+- **source cell** — the cell containing the formula (e.g. `B3`), for "open in Google Sheets" links
+- **source tab** — which tab (Google `sheetId`) the formula lives in
 - **target spreadsheet id** — parsed from the URL (`/d/<id>/` or `/d/<id>/edit`)
 - **target range** — the second argument, e.g. `Sheet1!A1:C10`
-- **source tab** — which tab the formula lives in
 
 Regex/extraction is case-insensitive for `IMPORTRANGE` and tolerant of `'` vs `"` quotes and whitespace.
 
@@ -94,10 +95,9 @@ Rules:
 
 ## Edge lifecycle (per scan merge)
 
-1. Before merging, mark all edges of scanned workbooks `seen=0`.
-2. For each extracted edge: upsert (unique on source/target/range/tab), increment `formula_count`, set `seen=1`, refresh `last_seen_at`.
-3. Purge edges still `seen=0` after the merge — dependencies that disappeared are removed from the graph.
-4. Store clean tabs in `scan_cache`; refresh `spreadsheets.version`/`modified_time`; resolve + refresh external target titles/visibility.
+1. **Delete** all edges of scanned workbooks (clear the slate for those workbooks).
+2. **Insert** each extracted formula as a row in `edges` — cell, tab, target, range, fresh `first_seen_at`, `last_seen_at = CURRENT_TIMESTAMP`.
+3. Store clean tabs in `scan_cache`; refresh `spreadsheets.version`/`modified_time`; resolve + refresh external target titles/visibility.
 
 ## Scan triggers
 
@@ -109,11 +109,11 @@ Rules:
 
 ## Fan-in computation
 
-Fan-in = number of inbound edges per target spreadsheet (how many tracked sheets depend on it). Computed from the `imports` table:
+Fan-in = number of inbound edges per target spreadsheet (how many tracked sheets depend on it). Computed from the `edges` table:
 
 ```sql
-SELECT target_spreadsheet AS spreadsheet_id, COUNT(*) AS fan_in
-FROM imports GROUP BY target_spreadsheet;
+SELECT target_google_id, COUNT(*) AS fan_in
+FROM edges GROUP BY target_google_id;
 ```
 
 This feeds node sizing in the graph UI. Fan-in is computed over **tracked** sheets only — external sheets referenced by IMPORTRANGE appear as leaf nodes with best-effort title + visibility (see "External target resolution" above); they're never scanned unless the user tracks them too. Scanning strangers' sheets is out of scope.

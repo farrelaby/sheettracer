@@ -51,8 +51,8 @@ internal/
   sheets/    — Sheets + Drive API client wrappers, field-masked requests
   scan/      — IMPORTRANGE extractor, worker pool, scan orchestrator
   graph/     — graph model (nodes/edges), fan-in computation, JSON serialization
-  db/        — connection, migrations, repositories (spreadsheets, sheets, imports,
-               scan_cache, scan_runs, settings)
+   db/        — connection, migrations, repositories (spreadsheets, sheets, edges,
+                scan_cache, scan_runs, settings)
 ```
 
 ## Concurrency model
@@ -79,14 +79,14 @@ scan trigger
                │ results channel
                ▼
 ┌─────────── merge phase (single writer) ───────┐
-│ upsert edges · mark seen · purge stale        │
+│ delete old edges · insert formulas · write scan_cache blobs    │
 │ recompute fan-in · write scan_cache blobs     │
 │ emit graph:updated event                      │
 └───────────────────────────────────────────────┘
 ```
 
 Rules:
-- Reads run concurrently; **writes go through a single merge goroutine** (SQLite single-writer in WAL mode).
+- Reads run concurrently; **writes go through a single merge goroutine** (Turso single-writer in WAL mode).
 - A scan is idempotent and resumable; each workbook is processed independently so a 403 on one never aborts the whole run.
 - Progress events are emitted per-workbook (`scan:progress`) and once at the end (`graph:updated`).
 
@@ -117,5 +117,5 @@ Registered with `application.RegisterEvent[T]` and emitted via `app.Event.Emit`:
 | Graph rendering | Cytoscape.js + fcose | 2D, purpose-built for dependency graphs, fan-in sizing |
 | Graph layout | fcose (force-directed, Obsidian-style) | Clustered, node size = connectivity |
 | Node sizing | fan-in (inbound degree) | Blast-radius visualization |
-| Database | SQLite (modernc.org/sqlite) | Single-process desktop app; pure-Go avoids CGO |
+| Database | Turso/libSQL (tursogo) | Single-process desktop app; pure-Go via purego, no CGO; MVCC concurrent writes; future cloud sync option |
 | Change detection | Drive `files.get` version/modifiedTime | Workbook-level, documented, reliable |
