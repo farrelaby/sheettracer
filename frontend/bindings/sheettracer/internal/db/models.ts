@@ -14,3 +14,11 @@ export interface Spreadsheet {
     "LastScanAt": string | null;
     "AddedAt": string;
 }
+
+export interface Tab {
+    "ID": number;
+    "SpreadsheetID": number;
+    "TabID": number;
+    "Title": string;
+    "Idx": number;
+}

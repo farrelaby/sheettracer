@@ -14,24 +14,46 @@ import (
 // SheetsService exposes spreadsheet management to the frontend. It is a
 // Wails-bound service.
 type SheetsService struct {
-	client         *oauth.Client
-	store          oauth.TokenStore
+	client          *oauth.Client
+	store           oauth.TokenStore
 	spreadsheetRepo *db.SpreadsheetRepo
-	sheetRepo      *db.SheetRepo
+	tabRepo         *db.TabRepo
+	sheetsClient    *sheets.Client
 }
 
 func NewSheetsService(
 	client *oauth.Client,
 	store oauth.TokenStore,
 	spreadsheetRepo *db.SpreadsheetRepo,
-	sheetRepo *db.SheetRepo,
+	tabRepo *db.TabRepo,
 ) *SheetsService {
 	return &SheetsService{
 		client:          client,
 		store:           store,
 		spreadsheetRepo: spreadsheetRepo,
-		sheetRepo:       sheetRepo,
+		tabRepo:         tabRepo,
+		sheetsClient:    nil,
 	}
+}
+
+func (s *SheetsService) getorCreateClient(ctx context.Context) (*sheets.Client, error) {
+	if s.sheetsClient != nil {
+		return s.sheetsClient, nil
+	}
+
+	src, err := s.tokenSource()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := sheets.NewClient(ctx, src)
+	if err != nil {
+		return nil, err
+	}
+
+	s.sheetsClient = client
+
+	return client, nil
 }
 
 // Add fetches metadata for the given Google Sheets URL, persists it, and
@@ -43,13 +65,9 @@ func (s *SheetsService) Add(url string, notes string) (*db.Spreadsheet, error) {
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	src, err := s.tokenSource()
-	if err != nil {
-		return nil, err
-	}
-
 	ctx := context.Background()
-	client, err := sheets.NewClient(ctx, src)
+
+	client, err := s.getorCreateClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -70,23 +88,24 @@ func (s *SheetsService) Add(url string, notes string) (*db.Spreadsheet, error) {
 	}
 
 	id, err := s.spreadsheetRepo.UpsertByGoogleID(sp)
+
 	if err != nil {
-		return nil, fmt.Errorf("persist spreadsheet: %w", err)
+		return nil, fmt.Errorf("[persist spreadsheet]: %w", err)
 	}
 	sp.ID = id
 
 	// Persist tabs.
-	tabs := make([]db.Sheet, len(meta.Tabs))
+	tabs := make([]db.Tab, len(meta.Tabs))
 	for i, t := range meta.Tabs {
-		tabs[i] = db.Sheet{
+		tabs[i] = db.Tab{
 			SpreadsheetID: id,
-			TabID:         t.TabID,
+			TabID:         t.SheetID,
 			Title:         t.Title,
 			Idx:           t.Idx,
 		}
 	}
-	if err := s.sheetRepo.UpsertAll(id, tabs); err != nil {
-		return nil, fmt.Errorf("persist tabs: %w", err)
+	if err := s.tabRepo.UpsertAll(id, tabs); err != nil {
+		return nil, fmt.Errorf("[persist tabs]: %w", err)
 	}
 
 	return sp, nil
@@ -114,16 +133,34 @@ func (s *SheetsService) tokenSource() (oauth2.TokenSource, error) {
 	return s.client.Source(context.Background(), tok, s.store), nil
 }
 
+type DbMetadata struct {
+	SpreadsheetID string
+	Title         string
+	Tabs          []db.Tab
+	Version       string
+	ModifiedTime  string
+	Visibility    string
+}
+
 // FetchMetadata is a thin wrapper for testing — calls the Google API directly.
-func (s *SheetsService) FetchMetadata(spreadsheetID string) (*sheets.Metadata, error) {
-	src, err := s.tokenSource()
+func (s *SheetsService) FetchDbMetadata(spreadsheetID int) (*DbMetadata, error) {
+	ss, err := s.spreadsheetRepo.GetSpreadsheetByID(spreadsheetID)
 	if err != nil {
 		return nil, err
 	}
-	ctx := context.Background()
-	client, err := sheets.NewClient(ctx, src)
+
+	tt, err := s.tabRepo.ListBySpreadsheet(int64(spreadsheetID))
 	if err != nil {
 		return nil, err
 	}
-	return client.FetchMetadata(ctx, spreadsheetID)
+
+	return &DbMetadata{
+		SpreadsheetID: ss.GoogleID,
+		Title:         ss.Title,
+		Visibility:    ss.Visibility,
+		Version:       ss.Version,
+		ModifiedTime:  ss.ModifiedTime,
+		Tabs:          tt,
+	}, nil
+
 }

@@ -71,7 +71,7 @@ func main() {
 		oauth.New(clientID(), clientSecret()),
 		oauth.NewKeyringStore(kr),
 		database.NewSpreadsheetRepo(db),
-		database.NewSheetRepo(db),
+		database.NewTabRepo(db),
 	)
 	app.RegisterService(application.NewService(sheetsService))
 

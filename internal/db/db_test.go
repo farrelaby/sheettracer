@@ -42,7 +42,7 @@ func TestOpenCreatesFullSchema(t *testing.T) {
 		t.Fatalf("user_version = %d, want %d", v, latestSchemaVersion)
 	}
 
-	for _, table := range []string{"settings", "spreadsheets", "sheets", "edges", "scan_cache", "scan_runs"} {
+	for _, table := range []string{"settings", "spreadsheets", "tabs", "edges", "scan_cache", "scan_runs"} {
 		var name string
 		err := handle.QueryRow(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table,
