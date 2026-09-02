@@ -10,5 +10,6 @@ export {
 
 export type {
     AccountInfo,
-    AuthState
+    AuthState,
+    DbMetadata
 } from "./models.js";

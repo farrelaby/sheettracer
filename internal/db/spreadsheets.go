@@ -85,3 +85,12 @@ func (r *SpreadsheetRepo) UpdateVisibility(id int64, visibility string) error {
 	_, err := r.db.Exec(`UPDATE spreadsheets SET visibility = ? WHERE id = ?`, visibility, id)
 	return err
 }
+
+func (r *SpreadsheetRepo) GetSpreadsheetByID(id int) (Spreadsheet, error) {
+	var ss Spreadsheet
+	err := r.db.Get(&ss,
+		`SELECT id, google_id, title, url, notes, version, modified_time, visibility, is_tracked, last_scan_at, added_at
+		 FROM spreadsheets WHERE id=? AND is_tracked = 1 ORDER BY added_at DESC`, id,
+	)
+	return ss, err
+}

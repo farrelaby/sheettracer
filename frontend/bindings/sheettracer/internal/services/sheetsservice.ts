@@ -14,9 +14,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as db$0 from "../db/models.js";
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as sheets$0 from "../sheets/models.js";
+import * as $models from "./models.js";
 
 /**
  * Add fetches metadata for the given Google Sheets URL, persists it, and
@@ -30,8 +31,8 @@ export function Add(url: string, notes: string): $CancellablePromise<db$0.Spread
 /**
  * FetchMetadata is a thin wrapper for testing — calls the Google API directly.
  */
-export function FetchMetadata(spreadsheetID: string): $CancellablePromise<sheets$0.Metadata | null> {
-    return $Call.ByID(1159559758, spreadsheetID);
+export function FetchDbMetadata(spreadsheetID: number): $CancellablePromise<$models.DbMetadata | null> {
+    return $Call.ByID(314275568, spreadsheetID);
 }
 
 /**
