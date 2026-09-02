@@ -134,9 +134,9 @@ func classifyVisibility(shared bool, canEdit bool) string {
 		return "private"
 	}
 	if canEdit {
-		return "public"
+		return "editor"
 	}
-	return "link-only"
+	return "shared"
 }
 
 // isNotFound checks if an error is a Google API 404.
