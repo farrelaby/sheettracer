@@ -3,6 +3,7 @@
   import GraphCanvas from "./components/GraphCanvas.svelte";
   import SidebarPanel from "./components/SidebarPanel.svelte";
   import InspectorPanel from "./components/InspectorPanel.svelte";
+  import ToastContainer from "./components/ToastContainer.svelte";
   import { selectionStore } from "./lib/selection.svelte";
 
   let sidebarOpen = $state(true);
@@ -44,4 +45,6 @@
   {#if !selectionStore.isNull()}
     <InspectorPanel />
   {/if}
+
+  <ToastContainer />
 </div>

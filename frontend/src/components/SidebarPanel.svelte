@@ -10,6 +10,7 @@
   } from "../../bindings/sheettracer/internal/services";
   import type { Spreadsheet } from "../../bindings/sheettracer/internal/db/models";
   import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
+  import { toast } from "@/lib/toast.svelte";
 
   interface Props {
     onClose: () => void;
@@ -48,6 +49,7 @@
       spreadsheetStore.set((await SheetsService.List()) ?? []);
     } catch (e) {
       console.error("Failed to load spreadsheets:", e);
+      toast.error("Failed to load spreadsheets");
     } finally {
       loading = false;
     }
@@ -89,8 +91,8 @@
     try {
       const sp = await SheetsService.Add(value, "");
       if (sp) {
-        // spreadsheets = [sp, ...spreadsheets];
         spreadsheetStore.append(sp);
+        toast.success("Spreadsheet added");
       }
       linkInput = "";
     } catch (e: any) {
@@ -112,11 +114,13 @@
 
   async function remove(id: number) {
     try {
-      await SheetsService.Remove(id);
-      // spreadsheets = spreadsheets.filter((s) => s.ID !== id);
-      spreadsheetStore.remove(id);
+      // await SheetsService.Remove(id);
+      // spreadsheetStore.remove(id);
+      toast.setPosition("top-center");
+      toast.success("Spreadsheet removed");
     } catch (e) {
       console.error("Failed to remove:", e);
+      toast.error("Failed to remove spreadsheet");
     }
   }
 
@@ -205,19 +209,21 @@
       type="submit"
       disabled={!linkInput.trim() || adding}
       class="mt-2 w-full rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40"
-      >{adding ? "Adding\u2026" : "Add spreadsheet"}</button
+      >{adding ? "Adding \u2026" : "Add spreadsheet"}</button
     >
   </form>
 
   <input
     bind:value={query}
-    placeholder="Search sheets\u2026"
+    placeholder={"Search sheets"}
     class="mx-4 mb-2 w-[calc(100%-2rem)] rounded-md border border-slate-800 bg-slate-950/50 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-slate-600"
   />
 
   <nav class="min-h-0 flex-1 overflow-y-auto px-2 py-4">
     {#if loading}
-      <p class="px-3 py-6 text-center text-xs text-slate-600">Loading\u2026</p>
+      <p class="px-3 py-6 text-center text-xs text-slate-600">
+        {"Loading \u2026"}
+      </p>
     {:else if filtered.length === 0}
       <p class="px-3 py-6 text-center text-xs text-slate-600">
         No tracked sheets yet.
