@@ -56,7 +56,7 @@ See `docs/ARCHITECTURE.md` for the diagram. Summary:
 Preflight per workbook:
 
 ```
-version_changed?  →  no  → skip entirely (cache hit, count as sheets_skipped)
+version_changed?  →  no  → skip entirely (cache hit, count as tabs_skipped)
                  →  yes → full metadata + formula re-read
 ```
 
@@ -72,9 +72,9 @@ Derived from `drive.files.get` using `shared` + `capabilities` fields:
 
 | State | Signal | Meaning |
 |---|---|---|
-| `private` | `shared=false` | Only specific people have access |
-| `link-only` | `shared=true, canEdit=false` | Anyone with the link can view |
-| `public` | `shared=true, canEdit=true` | Anyone with the link can edit |
+| `private` | `shared=false` | Not shared, or shared with specific people only |
+| `shared` | `shared=true, canEdit=false` | Viewer access (link-only or restricted) |
+| `editor` | `shared=true, canEdit=true` | Editor access |
 | `unknown` | `files.get` fails | See below |
 
 **`unknown` = failed `files.get`.** Drive returns HTTP 404 `notFound` for both "no read access" and "file doesn't exist" — deliberately, so the API doesn't leak whether a file exists. The backend treats both identically; the UI shows a muted "not accessible / not found" state. A genuinely public file is always readable by any authenticated user, so a 404 reliably means private-to-you or nonexistent — safe to classify as `unknown`.
@@ -90,7 +90,7 @@ Tracked sheets' IMPORTRANGE targets that the user hasn't added appear as leaf no
 Rules:
 
 - **Metadata only** — external targets are never content-scanned. "Scanning strangers' sheets is out of scope" (fan-in section below).
-- The frontend offers a **"Track this sheet"** action on a leaf node, which runs the normal add flow for that URL — the *only* way a discovered target becomes a scanned node.
+- The frontend offers a **"Track this tab"** action on a leaf node, which runs the normal add flow for that URL — the *only* way a discovered target becomes a scanned node.
 - If the user later tracks a target, it upgrades from leaf to a full tracked node; edges to it are unchanged.
 
 ## Edge lifecycle (per scan merge)

@@ -31,16 +31,16 @@ erDiagram
         TEXT notes
         TEXT version
         TIMESTAMP modified_time
-        TEXT visibility "CHECK: public, link-only, private, unknown"
+        TEXT visibility "CHECK: private, shared, editor, unknown"
         BOOLEAN is_tracked
         TIMESTAMP last_scan_at
         TIMESTAMP added_at
     }
 
-    sheets {
+    tabs {
         INTEGER id PK
         INTEGER spreadsheet_id FK
-        INTEGER sheet_id "gid from Google Sheets URL"
+        INTEGER tab_id "gid from Google Sheets URL"
         TEXT title
         INTEGER idx
     }
@@ -48,7 +48,7 @@ erDiagram
     edges {
         INTEGER id PK
         INTEGER source_spreadsheet FK
-        INTEGER source_sheet_id "gid of source tab"
+        INTEGER source_tab_id "gid of source tab"
         TEXT source_cell
         TEXT target_google_id
         TEXT target_range
@@ -59,7 +59,7 @@ erDiagram
     scan_cache {
         INTEGER id PK
         INTEGER spreadsheet_id FK
-        INTEGER sheet_id "gid from Google Sheets URL"
+        INTEGER tab_id "gid from Google Sheets URL"
         BLOB payload
         TEXT fingerprint
         TIMESTAMP fetched_at
@@ -71,8 +71,8 @@ erDiagram
         TIMESTAMP started_at
         TIMESTAMP finished_at
         TEXT status "CHECK: running, ok, partial, error"
-        INTEGER sheets_scanned
-        INTEGER sheets_skipped
+        INTEGER tabs_scanned
+        INTEGER tabs_skipped
         TEXT error
     }
 
@@ -81,10 +81,10 @@ erDiagram
         JSONB v
     }
 
-    spreadsheets ||--o{ sheets : "has tabs"
+    spreadsheets ||--o{ tabs : "has tabs"
     spreadsheets ||--o{ edges : "imports from"
     spreadsheets ||--o{ scan_cache : "cached payloads"
-    sheets }o--|| spreadsheets : "belongs to"
+    tabs }o--|| spreadsheets : "belongs to"
     edges }o--|| spreadsheets : "source"
     scan_cache }o--|| spreadsheets : "belongs to"
 ```
@@ -102,20 +102,20 @@ CREATE TABLE spreadsheets (
     version         TEXT,
     modified_time   TIMESTAMP,
     visibility      TEXT NOT NULL DEFAULT 'private'
-                    CHECK (visibility IN ('public', 'link-only', 'private', 'unknown')),
+                    CHECK (visibility IN ('private', 'shared', 'editor', 'unknown')),
     is_tracked      BOOLEAN NOT NULL DEFAULT 1,
     last_scan_at    TIMESTAMP,
     added_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabs within a workbook (metadata, not graph nodes)
-CREATE TABLE sheets (
+CREATE TABLE tabs (
     id              INTEGER PRIMARY KEY,
     spreadsheet_id  INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    sheet_id        INTEGER NOT NULL,              -- Google Sheets "gid" parameter from URL
+    tab_id          INTEGER NOT NULL,              -- Google Sheets "gid" parameter from URL
     title           TEXT NOT NULL,
     idx             INTEGER,
-    UNIQUE (spreadsheet_id, sheet_id)
+    UNIQUE (spreadsheet_id, tab_id)
 );
 
 -- Import dependencies (graph edges), one row per IMPORTRANGE formula.
@@ -123,13 +123,13 @@ CREATE TABLE sheets (
 CREATE TABLE edges (
     id                   INTEGER PRIMARY KEY,
     source_spreadsheet   INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    source_sheet_id      INTEGER NOT NULL,       -- Google Sheets "gid" of the tab containing the formula
+    source_tab_id       INTEGER NOT NULL,       -- Google Sheets "gid" of the tab containing the formula
     source_cell          TEXT NOT NULL,           -- cell reference, e.g. 'B3'
     target_google_id     TEXT NOT NULL,           -- spreadsheetId parsed from IMPORTRANGE url
     target_range         TEXT,                    -- e.g. 'Sheet1!A1:C10'
     first_seen_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_seen_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (source_spreadsheet, source_sheet_id, target_google_id, target_range)
+    UNIQUE (source_spreadsheet, source_tab_id, target_google_id, target_range)
 );
 CREATE INDEX idx_edges_source ON edges(source_spreadsheet);
 CREATE INDEX idx_edges_target ON edges(target_google_id);
@@ -139,11 +139,11 @@ CREATE INDEX idx_edges_pair ON edges(source_spreadsheet, target_google_id);
 CREATE TABLE scan_cache (
     id             INTEGER PRIMARY KEY,
     spreadsheet_id INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    sheet_id       INTEGER,                      -- Google Sheets "gid" parameter from URL
+    tab_id          INTEGER,                      -- Google Sheets "gid" parameter from URL
     payload        BLOB NOT NULL,
     fingerprint    TEXT,
     fetched_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (spreadsheet_id, sheet_id)
+    UNIQUE (spreadsheet_id, tab_id)
 );
 
 -- One row per scan run
@@ -153,8 +153,8 @@ CREATE TABLE scan_runs (
     started_at     TIMESTAMP NOT NULL,
     finished_at    TIMESTAMP,
     status         TEXT NOT NULL CHECK (status IN ('running', 'ok', 'partial', 'error')),
-    sheets_scanned INTEGER NOT NULL DEFAULT 0,
-    sheets_skipped INTEGER NOT NULL DEFAULT 0,
+    tabs_scanned    INTEGER NOT NULL DEFAULT 0,
+    tabs_skipped    INTEGER NOT NULL DEFAULT 0,
     error          TEXT
 );
 
@@ -180,8 +180,8 @@ CREATE TABLE settings (
 
 ## Graph model
 
-- **Node** = a row in `spreadsheets` (file-level granularity; tabs live in `sheets` as metadata).
-- **Node visibility** (`spreadsheets.visibility`) is derived from `drive.files.get` using `shared` + `capabilities` fields (`shared=false` → `private`, `shared=true && canEdit=false` → `link-only`, `shared=true && canEdit=true` → `public`). An external target we can't access resolves to `unknown` (Drive returns 404 `notFound` for both "no access" and "doesn't exist" — see `docs/SCANNING.md`).
+- **Node** = a row in `spreadsheets` (file-level granularity; tabs live in `tabs` as metadata).
+- **Node visibility** (`spreadsheets.visibility`) is derived from `drive.files.get` using `shared` + `capabilities` fields (`shared=false` → `private`, `shared=true && canEdit=false` → `shared`, `shared=true && canEdit=true` → `editor`). An external target we can't access resolves to `unknown` (Drive returns 404 `notFound` for both "no access" and "doesn't exist" — see `docs/SCANNING.md`).
 - **Edge** = one or more rows in `edges` sharing the same `(source_spreadsheet, target_google_id)`. Each row is a single IMPORTRANGE formula with its cell location.
 - **Edge width** (drives visual thickness in the graph UI) = count of formulas per source-target pair:
 
@@ -202,7 +202,7 @@ GROUP BY target_google_id;
 - **Open in Google Sheets** — construct a URL from the edge's source location:
 
 ```
-{spreadsheets.url}?gid={source_sheet_id}#gid={source_sheet_id}&range={source_cell}
+{spreadsheets.url}?gid={source_tab_id}#gid={source_tab_id}&range={source_cell}
 ```
 
 ## Edge lifecycle (scan merge)

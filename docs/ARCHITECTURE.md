@@ -52,7 +52,7 @@ internal/
   sheets/    — Google Sheets + Drive API client, URL parser, visibility classifier
   scan/      — IMPORTRANGE extractor, worker pool, scan orchestrator
   graph/     — graph model (nodes/edges), fan-in computation, JSON serialization
-  db/        — sqlx connection, migrations, repositories (spreadsheets, sheets, edges,
+  db/        — sqlx connection, migrations, repositories (spreadsheets, tabs, edges,
                scan_cache, scan_runs, settings)
 ```
 
@@ -96,7 +96,7 @@ Rules:
 1. Frontend sends a Google Sheets link to `SheetsService.Add(url, notes)`.
 2. `sheets.ParseID` extracts the spreadsheet ID from the URL.
 3. `sheets.Client.FetchMetadata` calls `spreadsheets.get` (title, tabs) + `drive.files.get` (version, modifiedTime, shared, capabilities).
-4. Workbook is upserted into `spreadsheets` via `SpreadsheetRepo`, tabs via `SheetRepo`.
+4. Workbook is upserted into `spreadsheets` via `SpreadsheetRepo`, tabs via `TabRepo`.
 5. The saved `Spreadsheet` is returned to the frontend and prepended to the sidebar list.
 
 ## Events (Go → frontend)
@@ -105,7 +105,7 @@ Registered with `application.RegisterEvent[T]` and emitted via `app.Event.Emit`:
 
 | Event | Payload | Purpose |
 |---|---|---|
-| `scan:progress` | `{ spreadsheetId, title, status, sheetsScanned }` | Progress during scans |
+| `scan:progress` | `{ spreadsheetId, title, status, tabsScanned }` | Progress during scans |
 | `graph:updated` | serialized graph | Frontend refreshes Cytoscape |
 | `auth:state` | `{ connected, email, status }` | OAuth status changes |
 
@@ -120,5 +120,5 @@ Registered with `application.RegisterEvent[T]` and emitted via `app.Event.Emit`:
 | Graph layout | fcose (force-directed, Obsidian-style) | Clustered, node size = connectivity |
 | Node sizing | fan-in (inbound degree) | Blast-radius visualization |
 | Database | Turso/libSQL (tursogo) | Single-process desktop app; pure-Go via purego, no CGO; MVCC concurrent writes; future cloud sync option |
-| DB layer | sqlx + repositories | Struct scanning via `jmoiron/sqlx`; `SpreadsheetRepo`, `SheetRepo`, `Settings` follow repo pattern |
+| DB layer | sqlx + repositories | Struct scanning via `jmoiron/sqlx`; `SpreadsheetRepo`, `TabRepo`, `Settings` follow repo pattern |
 | Change detection | Drive `files.get` version/modifiedTime | Workbook-level, documented, reliable |

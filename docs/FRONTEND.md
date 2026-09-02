@@ -22,7 +22,7 @@ App.svelte            — shell, routing between views, top-level state
 ├─ ScanProgress.svelte    — live scan:progress events
 └─ GraphView.svelte       — the Cytoscape canvas
    ├─ GraphCanvas.svelte  — owns the cytoscape instance
-   ├─ NodeDetailPanel.svelte — selected-node details (visibility badge, imports, open-in-Google, leaf → "Track this sheet")
+   ├─ NodeDetailPanel.svelte — selected-node details (visibility badge, imports, open-in-Google, leaf → "Track this tab")
    └─ GraphLegend.svelte     — color/edge meaning
 ```
 
@@ -55,9 +55,9 @@ node: {
 - Edge labels (the range, e.g. `Sheet1!A1:C10`) shown **on hover/select only** to avoid clutter.
 - Hover → highlight neighborhood, fade the rest (Obsidian focus mode).
 
-## Leaf node "Track this sheet"
+## Leaf node "Track this tab"
 
-External leaves (sheets the user didn't add) get a **Track this sheet** action in the detail panel — the only path to content-scanning a discovered target. It runs the normal add flow (`SheetsService.Add`) for that URL; on success the leaf upgrades to a tracked node.
+External leaves (sheets the user didn't add) get a **Track this tab** action in the detail panel — the only path to content-scanning a discovered target. It runs the normal add flow (`SheetsService.Add`) for that URL; on success the leaf upgrades to a tracked node.
 
 ## Events
 
