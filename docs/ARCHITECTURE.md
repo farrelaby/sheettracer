@@ -32,27 +32,28 @@ SheetTracer is a Wails v3 desktop app: a Go backend talks to Google's APIs and o
 
 ## Services (Wails v3)
 
-Wails v3 binds Go services to the frontend; generated TypeScript bindings live in `frontend/src/bindings/`. Services are registered in `main.go` via `application.NewService(...)`.
+Wails v3 binds Go services to the frontend; generated TypeScript bindings live in `frontend/bindings/`. Services are registered in `main.go` via `application.NewService(...)`.
 
 | Service | Responsibilities |
 |---|---|
 | `OAuthService` | Drive the connect/disconnect flow, return auth state, expose token for other services |
-| `SheetsService` | Fetch spreadsheet metadata, chunked cell reads, per-file `version`/`modifiedTime` lookup |
+| `SheetsService` | Add/list/remove spreadsheets, fetch metadata (title, tabs, version, visibility) from Google APIs |
 | `ScanService` | Orchestrate scans (parallel worker pool), extract IMPORTRANGE edges, persist results |
 | `GraphService` | Query the stored graph for the frontend: nodes, edges, fan-in counts, detail payloads |
 
 ## Package layout
 
-Services stay in `package main` (matching the Wails v3 template). Domain logic lives in `internal/`:
+Services live in `internal/services/` (Wails v3 bindings). Domain logic lives in `internal/`:
 
 ```
 internal/
-  oauth/     — loopback server, token exchange, refresh, persistence to settings
-  sheets/    — Sheets + Drive API client wrappers, field-masked requests
+  services/  — Wails-bound services (OAuthService, SheetsService)
+  oauth/     — loopback server, token exchange, refresh, keyring persistence
+  sheets/    — Google Sheets + Drive API client, URL parser, visibility classifier
   scan/      — IMPORTRANGE extractor, worker pool, scan orchestrator
   graph/     — graph model (nodes/edges), fan-in computation, JSON serialization
-   db/        — connection, migrations, repositories (spreadsheets, sheets, edges,
-                scan_cache, scan_runs, settings)
+  db/        — sqlx connection, migrations, repositories (spreadsheets, tabs, edges,
+               scan_cache, scan_runs, settings)
 ```
 
 ## Concurrency model
@@ -92,10 +93,11 @@ Rules:
 
 ## Data flow: adding a spreadsheet
 
-1. Frontend sends a Google Sheets link to `SheetsService`.
-2. Service parses the spreadsheet id, fetches metadata (title, tabs, `version`, `modifiedTime`).
-3. Workbook is upserted into the DB, then a scan is triggered.
-4. The graph event is pushed to the frontend; Cytoscape batch-updates.
+1. Frontend sends a Google Sheets link to `SheetsService.Add(url, notes)`.
+2. `sheets.ParseID` extracts the spreadsheet ID from the URL.
+3. `sheets.Client.FetchMetadata` calls `spreadsheets.get` (title, tabs) + `drive.files.get` (version, modifiedTime, shared, capabilities).
+4. Workbook is upserted into `spreadsheets` via `SpreadsheetRepo`, tabs via `TabRepo`.
+5. The saved `Spreadsheet` is returned to the frontend and prepended to the sidebar list.
 
 ## Events (Go → frontend)
 
@@ -103,7 +105,7 @@ Registered with `application.RegisterEvent[T]` and emitted via `app.Event.Emit`:
 
 | Event | Payload | Purpose |
 |---|---|---|
-| `scan:progress` | `{ spreadsheetId, title, status, sheetsScanned }` | Progress during scans |
+| `scan:progress` | `{ spreadsheetId, title, status, tabsScanned }` | Progress during scans |
 | `graph:updated` | serialized graph | Frontend refreshes Cytoscape |
 | `auth:state` | `{ connected, email, status }` | OAuth status changes |
 
@@ -118,4 +120,5 @@ Registered with `application.RegisterEvent[T]` and emitted via `app.Event.Emit`:
 | Graph layout | fcose (force-directed, Obsidian-style) | Clustered, node size = connectivity |
 | Node sizing | fan-in (inbound degree) | Blast-radius visualization |
 | Database | Turso/libSQL (tursogo) | Single-process desktop app; pure-Go via purego, no CGO; MVCC concurrent writes; future cloud sync option |
+| DB layer | sqlx + repositories | Struct scanning via `jmoiron/sqlx`; `SpreadsheetRepo`, `TabRepo`, `Settings` follow repo pattern |
 | Change detection | Drive `files.get` version/modifiedTime | Workbook-level, documented, reliable |

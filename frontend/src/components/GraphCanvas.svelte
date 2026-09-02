@@ -2,8 +2,8 @@
   import { onMount } from "svelte";
   import cytoscape from "cytoscape";
   import fcose from "cytoscape-fcose";
-  import { graphElements } from "./demo-data";
-  import { selection } from "@/lib/selection.svelte";
+  import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
+  import { selectionStore } from "@/lib/selection.svelte";
 
   let container: HTMLDivElement | undefined = $state();
   let cy: cytoscape.Core | undefined;
@@ -13,7 +13,7 @@
     cytoscape.use(fcose);
     cy = cytoscape({
       container,
-      elements: graphElements,
+      elements: [],
       style: [
         {
           selector: "node",
@@ -33,8 +33,8 @@
             height: "mapData(fanIn, 0, 4, 34, 110)",
           },
         },
-        { selector: "node.public", style: { "border-color": "#34d399" } },
-        { selector: "node.linkOnly", style: { "border-color": "#fbbf24" } },
+        { selector: "node.editor", style: { "border-color": "#34d399" } },
+        { selector: "node.shared", style: { "border-color": "#fbbf24" } },
         { selector: "node.private", style: { "border-color": "#f87171" } },
         { selector: "node.unknown", style: { "border-color": "#64748b" } },
         {
@@ -100,17 +100,34 @@
     cy.on("tap", "node,edge", (evt) => {
       const el = evt.target as cytoscape.SingularElementReturnValue;
       // onSelect({ type: el.isNode() ? "node" : "edge", id: el.id() });
-      selection.set({ type: el.isNode() ? "node" : "edge", id: el.id() });
+      selectionStore.set({ type: el.isNode() ? "node" : "edge", id: el.id() });
     });
 
     cy.on("tap", (evt) => {
-      if ((evt.target as unknown) === cy) selection.set(null);
+      if ((evt.target as unknown) === cy) selectionStore.set(null);
     });
     cy.on("mouseover", "node", (evt) => evt.target.addClass("ehover"));
     cy.on("mouseout", "node", (evt) => evt.target.removeClass("ehover"));
 
     cy.on("mouseover", "edge", (evt) => evt.target.addClass("ehover"));
     cy.on("mouseout", "edge", (evt) => evt.target.removeClass("ehover"));
+  });
+
+  $effect(() => {
+    if (!cy) return;
+    const elements = spreadsheetStore.graphElements;
+
+    cy.elements().remove();
+    if (elements.length > 0) {
+      cy.add(elements);
+      cy.layout({
+        name: "fcose",
+        animate: false,
+        idealEdgeLength: 110,
+        nodeRepulsion: () => 4800,
+        padding: 40,
+      } as unknown as cytoscape.LayoutOptions).run();
+    }
   });
 </script>
 
@@ -125,11 +142,11 @@
 >
   <span class="flex items-center gap-1.5"
     ><span class="h-2 w-2 rounded-sm border-2 border-emerald-400 bg-slate-800"
-    ></span>public</span
+    ></span>editor</span
   >
   <span class="flex items-center gap-1.5"
     ><span class="h-2 w-2 rounded-sm border-2 border-amber-400 bg-slate-800"
-    ></span>link-only</span
+    ></span>shared</span
   >
   <span class="flex items-center gap-1.5"
     ><span class="h-2 w-2 rounded-sm border-2 border-red-400 bg-slate-800"

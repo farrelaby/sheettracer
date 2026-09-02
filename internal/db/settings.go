@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // Settings is a key/value repository for non-secret preferences and last app
@@ -14,10 +16,10 @@ import (
 // Each key corresponds to a settings tab (e.g. "general", "scan"). The value
 // is stored as JSONB and can be any JSON-serializable structure.
 type Settings struct {
-	db *sql.DB
+	db *sqlx.DB
 }
 
-func NewSettings(db *sql.DB) *Settings {
+func NewSettings(db *sqlx.DB) *Settings {
 	return &Settings{db: db}
 }
 

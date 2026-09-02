@@ -3,15 +3,15 @@ export type Selection =
   | { type: "edge"; id: string };
 
 class SelectionState {
-    value = $state<Selection | null>(null);
+  value = $state<Selection | null>(null);
 
-    set(value: Selection | null) {
-        this.value = value;
-    }
+  set(value: Selection | null) {
+    this.value = value;
+  }
 
-    isNull(){
-        return this.value === null;
-    }
+  isNull() {
+    return this.value === null;
+  }
 }
 
-export const selection = new SelectionState();
+export const selectionStore = new SelectionState();

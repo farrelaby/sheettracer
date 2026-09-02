@@ -13,17 +13,17 @@ CREATE TABLE spreadsheets (
     version         TEXT,
     modified_time   TIMESTAMP,
     visibility      TEXT NOT NULL DEFAULT 'private'
-                    CHECK (visibility IN ('public', 'link-only', 'private', 'unknown')),
+                    CHECK (visibility IN ('private', 'shared', 'editor', 'unknown')),
     is_tracked      BOOLEAN NOT NULL DEFAULT 1,
     last_scan_at    TIMESTAMP,
     added_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabs within a workbook (metadata, not graph nodes)
-CREATE TABLE sheets (
+CREATE TABLE tabs (
     id              INTEGER PRIMARY KEY,
     spreadsheet_id  INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    tab_id          INTEGER NOT NULL,
+    tab_id          INTEGER NOT NULL,              -- Google Sheets "gid" parameter from URL
     title           TEXT NOT NULL,
     idx             INTEGER,
     UNIQUE (spreadsheet_id, tab_id)
@@ -34,7 +34,7 @@ CREATE TABLE sheets (
 CREATE TABLE edges (
     id                   INTEGER PRIMARY KEY,
     source_spreadsheet   INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    source_tab_id        INTEGER NOT NULL,       -- Google sheetId of the tab containing the formula
+    source_tab_id       INTEGER NOT NULL,       -- Google Sheets "gid" of the tab containing the formula
     source_cell          TEXT NOT NULL,           -- cell reference, e.g. 'B3'
     target_google_id     TEXT NOT NULL,           -- spreadsheetId parsed from IMPORTRANGE url
     target_range         TEXT,                    -- e.g. 'Sheet1!A1:C10'
@@ -50,7 +50,7 @@ CREATE INDEX idx_edges_pair ON edges(source_spreadsheet, target_google_id);
 CREATE TABLE scan_cache (
     id             INTEGER PRIMARY KEY,
     spreadsheet_id INTEGER NOT NULL REFERENCES spreadsheets(id) ON DELETE CASCADE,
-    tab_id         INTEGER,
+    tab_id          INTEGER,                      -- Google Sheets "gid" parameter from URL
     payload        BLOB NOT NULL,
     fingerprint    TEXT,
     fetched_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,8 +64,8 @@ CREATE TABLE scan_runs (
     started_at     TIMESTAMP NOT NULL,
     finished_at    TIMESTAMP,
     status         TEXT NOT NULL CHECK (status IN ('running', 'ok', 'partial', 'error')),
-    sheets_scanned INTEGER NOT NULL DEFAULT 0,
-    sheets_skipped INTEGER NOT NULL DEFAULT 0,
+    tabs_scanned    INTEGER NOT NULL DEFAULT 0,
+    tabs_skipped    INTEGER NOT NULL DEFAULT 0,
     error          TEXT
 );
 

@@ -3,6 +3,7 @@ module sheettracer
 go 1.25.0
 
 require (
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.9
 	github.com/zalando/go-keyring v0.2.8

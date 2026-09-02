@@ -56,7 +56,7 @@ See `docs/ARCHITECTURE.md` for the diagram. Summary:
 Preflight per workbook:
 
 ```
-version_changed?  →  no  → skip entirely (cache hit, count as sheets_skipped)
+version_changed?  →  no  → skip entirely (cache hit, count as tabs_skipped)
                  →  yes → full metadata + formula re-read
 ```
 
@@ -68,13 +68,13 @@ Notes:
 
 ## Visibility (public vs private)
 
-Derived from the file's `permissions` list during `files.get`:
+Derived from `drive.files.get` using `shared` + `capabilities` fields:
 
 | State | Signal | Meaning |
 |---|---|---|
-| `public` | a permission with `type='anyone'` | Searchable by anyone |
-| `link-only` | `type='anyoneWithLink'` | Anyone with the link can view |
-| `private` | only `type='user'` / `'group'` / `'domain'` | Shared with specific people/orgs only |
+| `private` | `shared=false` | Not shared, or shared with specific people only |
+| `shared` | `shared=true, canEdit=false` | Viewer access (link-only or restricted) |
+| `editor` | `shared=true, canEdit=true` | Editor access |
 | `unknown` | `files.get` fails | See below |
 
 **`unknown` = failed `files.get`.** Drive returns HTTP 404 `notFound` for both "no read access" and "file doesn't exist" — deliberately, so the API doesn't leak whether a file exists. The backend treats both identically; the UI shows a muted "not accessible / not found" state. A genuinely public file is always readable by any authenticated user, so a 404 reliably means private-to-you or nonexistent — safe to classify as `unknown`.
@@ -84,13 +84,13 @@ Derived from the file's `permissions` list during `files.get`:
 Tracked sheets' IMPORTRANGE targets that the user hasn't added appear as leaf nodes. During the scan merge:
 
 1. Collect target spreadsheet ids from extracted edges that aren't already in `spreadsheets`.
-2. Best-effort `files.get` each (same field mask: `name` + `permissions`) to resolve the **title** and **visibility** for display. Cache the result in `scan_cache` so each new target costs ~1 call, not 1-per-scan.
+2. Best-effort `files.get` each (same field mask: `shared`, `capabilities`) to resolve the **title** and **visibility** for display. Cache the result in `scan_cache` so each new target costs ~1 call, not 1-per-scan.
 3. On 404 → store as `unknown` (no title, "not accessible / not found" state).
 
 Rules:
 
 - **Metadata only** — external targets are never content-scanned. "Scanning strangers' sheets is out of scope" (fan-in section below).
-- The frontend offers a **"Track this sheet"** action on a leaf node, which runs the normal add flow for that URL — the *only* way a discovered target becomes a scanned node.
+- The frontend offers a **"Track this tab"** action on a leaf node, which runs the normal add flow for that URL — the *only* way a discovered target becomes a scanned node.
 - If the user later tracks a target, it upgrades from leaf to a full tracked node; edges to it are unchanged.
 
 ## Edge lifecycle (per scan merge)

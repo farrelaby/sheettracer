@@ -30,10 +30,10 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 2 — Add spreadsheet + metadata
 
 **Deliverables**
-- `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `permissions(id,type,role)`).
-- `internal/db/`: `spreadsheets`/`sheets`/`edges` repositories (db bootstrap + migrations landed in Milestone 1).
-- `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility`, dedup on `google_id`.
-- `AddSheet.svelte` (404 error state) + `SpreadsheetList.svelte` (visibility icons).
+- `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `shared`, `capabilities`).
+- `internal/db/`: `SpreadsheetRepo` (UpsertByGoogleID, GetByGoogleID, ListTracked, Delete) + `TabRepo` (UpsertAll, ListBySpreadsheet) — sqlx-backed repositories.
+- `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility` (via `shared` + `capabilities`), dedup on `google_id`.
+- `SidebarPanel.svelte`: calls `SheetsService.List()` on mount, `Add()` with 404 error state, `Remove()` to delete.
 
 **Acceptance**: paste a link → workbook appears in the list with title/tabs + visibility icon; a link to a sheet you can't access shows "no access / not found"; adding the same link twice dedups.
 
@@ -46,21 +46,21 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 - `ScanService.Rescan()` and `RescanOne(id)`; `scan:progress` + `graph:updated` events.
 - Per-workbook 403 handling → `status='partial'`; `GraphPayload` nodes carry `visibility`.
 
-**Acceptance**: add 2–3 sheets with cross-references → edges persisted + target leaves show title/visibility; a removed IMPORTRANGE disappears after rescan; a no-access sheet fails gracefully; a target you can't access shows `unknown`.
+**Acceptance**: add 2–3 spreadsheets with cross-references → edges persisted + target leaves show title/visibility; a removed IMPORTRANGE disappears after rescan; a no-access sheet fails gracefully; a target you can't access shows `unknown`.
 
 ## Milestone 4 — Graph view
 
 **Deliverables**
 - Add Cytoscape.js + `fcose`.
 - `GraphCanvas.svelte`: instance-in-`onMount`, `cy.batch` updates, fan-in node sizing via `mapData`, cluster coloring, external-vs-internal edges, hover labels, focus-on-hover.
-- `NodeDetailPanel.svelte`: imports, fan-in, visibility badge, modified time, open-in-Google, leaf → "Track this sheet".
+- `NodeDetailPanel.svelte`: imports, fan-in, visibility badge, modified time, open-in-Google, leaf → "Track this tab".
 - `GraphLegend.svelte` (incl. visibility icons); visibility icon overlays on nodes.
 - `GraphService.Graph()` returns `GraphPayload` with `visibility` per node (`docs/FRONTEND.md`).
 
 - **View menu**: Toggle Sidebar (`CmdOrCtrl+B`), Toggle Inspector (`CmdOrCtrl+Shift+I`), separator, Zoom In (`CmdOrCtrl+=`), Zoom Out (`CmdOrCtrl+-`), Reset Zoom (`CmdOrCtrl+0`). Menu items emit Wails events; `App.svelte` and `GraphCanvas.svelte` listen and react.
 - **Help menu**: Documentation (opens `docs/` URL or local path via `app.Browser.OpenURL`), Report Issue (opens GitHub issues page).
 
-**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; every node shows its visibility icon; click shows detail (incl. `unknown`/no-access state); leaf offers "Track this sheet"; layout re-runs on update; View menu toggles sidebar/inspector and controls zoom; keyboard shortcuts work; Help menu links open in browser.
+**Acceptance**: graph renders Obsidian-style; node size reflects inbound dependencies; every node shows its visibility icon; click shows detail (incl. `unknown`/no-access state); leaf offers "Track this tab"; layout re-runs on update; View menu toggles sidebar/inspector and controls zoom; keyboard shortcuts work; Help menu links open in browser.
 
 ## Milestone 5 — Cache revalidation + scan triggers
 
@@ -68,7 +68,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 - Preflight via `drive.files.get` `version` comparison; skip unchanged workbooks (cache hits).
 - `scan_cache` read/write + fingerprint invalidation.
 - Triggers: manual rescan, rescan-on-launch (background), rescan-on-add.
-- `sheets_skipped` counter surfaced in UI/scan runs.
+- `tabs_skipped` counter surfaced in UI/scan runs.
 
 **Acceptance**: launch scan with nothing changed → near-zero cell reads (all skipped); touch one workbook → only it re-reads.
 

@@ -1,6 +1,6 @@
 import type cytoscape from "cytoscape";
 
-export type Visibility = "public" | "linkOnly" | "private" | "unknown";
+export type Visibility = "private" | "shared" | "editor" | "unknown";
 
 export interface DemoNode {
   id: string;
@@ -34,7 +34,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-fin",
     title: "Finance Dashboard",
     kind: "tracked",
-    visibility: "linkOnly",
+    visibility: "shared",
     fanIn: 4,
     fanOut: 1,
     modified: "2 h ago",
@@ -67,7 +67,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-ops",
     title: "Ops Metrics",
     kind: "tracked",
-    visibility: "public",
+    visibility: "editor",
     fanIn: 0,
     fanOut: 1,
     modified: "5 d ago",
@@ -78,7 +78,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-prod",
     title: "Product Analytics",
     kind: "tracked",
-    visibility: "public",
+    visibility: "editor",
     fanIn: 2,
     fanOut: 0,
     modified: "6 h ago",
@@ -89,7 +89,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-cs",
     title: "CS Quality",
     kind: "tracked",
-    visibility: "linkOnly",
+    visibility: "shared",
     fanIn: 0,
     fanOut: 1,
     modified: "4 d ago",
@@ -122,7 +122,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-ext2",
     title: "Budget Master",
     kind: "external",
-    visibility: "linkOnly",
+    visibility: "shared",
     fanIn: 1,
     fanOut: 0,
     modified: "—",
@@ -144,7 +144,7 @@ export const demoNodes: DemoNode[] = [
     id: "n-ext4",
     title: "CRM Dump",
     kind: "external",
-    visibility: "public",
+    visibility: "editor",
     fanIn: 1,
     fanOut: 0,
     modified: "—",
@@ -320,9 +320,9 @@ export function getEdgeDetail(id: string): EdgeDetail | undefined {
 }
 
 export const visibilityLabel: Record<Visibility, string> = {
-  public: "Public",
-  linkOnly: "Anyone with the link",
   private: "Private",
+  shared: "Shared",
+  editor: "Editor",
   unknown: "Unknown",
 };
 
