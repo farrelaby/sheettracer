@@ -2,13 +2,14 @@
   import { onMount } from "svelte";
   import VisibilityIcon from "./VisibilityIcon.svelte";
   import { fly } from "svelte/transition";
-  import { selection, type Selection } from "../lib/selection.svelte";
+  import { selectionStore, type Selection } from "../lib/selection.svelte";
   import OAuthStatus from "./OAuthStatus.svelte";
   import {
     OAuthService,
     SheetsService,
   } from "../../bindings/sheettracer/internal/services";
   import type { Spreadsheet } from "../../bindings/sheettracer/internal/db/models";
+  import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
 
   interface Props {
     onClose: () => void;
@@ -27,7 +28,7 @@
   let width = $state(initialWidth());
   let dragging = $state(false);
 
-  let sheets = $state<Spreadsheet[]>([]);
+  let spreadsheets = $derived(spreadsheetStore.value);
   let loading = $state(true);
   let query = $state("");
   let linkInput = $state("");
@@ -37,14 +38,14 @@
   let rescanOnLaunch = $state(true);
 
   const filtered = $derived(
-    sheets.filter((s) =>
+    spreadsheets.filter((s) =>
       s.Title.toLowerCase().includes(query.trim().toLowerCase()),
     ),
   );
 
   onMount(async () => {
     try {
-      sheets = await SheetsService.List();
+      spreadsheetStore.set((await SheetsService.List()) ?? []);
     } catch (e) {
       console.error("Failed to load spreadsheets:", e);
     } finally {
@@ -72,7 +73,7 @@
   }
 
   function onSelect(s: Selection) {
-    selection.set(s);
+    selectionStore.set(s);
   }
 
   async function addSheet() {
@@ -88,13 +89,19 @@
     try {
       const sp = await SheetsService.Add(value, "");
       if (sp) {
-        sheets = [sp, ...sheets];
+        // spreadsheets = [sp, ...spreadsheets];
+        spreadsheetStore.append(sp);
       }
       linkInput = "";
     } catch (e: any) {
       const msg = String(e?.message || e);
-      if (msg.includes("no access") || msg.includes("not found") || msg.includes("404")) {
-        addError = "Could not access this sheet \u2014 no access, or it doesn\u2019t exist.";
+      if (
+        msg.includes("no access") ||
+        msg.includes("not found") ||
+        msg.includes("404")
+      ) {
+        addError =
+          "Could not access this sheet \u2014 no access, or it doesn\u2019t exist.";
       } else {
         addError = msg || "Failed to add spreadsheet.";
       }
@@ -106,34 +113,22 @@
   async function remove(id: number) {
     try {
       await SheetsService.Remove(id);
-      sheets = sheets.filter((s) => s.ID !== id);
+      // spreadsheets = spreadsheets.filter((s) => s.ID !== id);
+      spreadsheetStore.remove(id);
     } catch (e) {
       console.error("Failed to remove:", e);
     }
   }
 
-  function visibilityLabel(v: string): string {
-    switch (v) {
-      case "public":
-        return "Public";
-      case "link-only":
-        return "Link-only";
-      case "private":
-        return "Private";
-      default:
-        return "Unknown";
-    }
-  }
-
-  function statusDot(s: Spreadsheet): string {
-    if (!s.LastScanAt) return "bg-slate-500";
+  function statusDot(lastScanAt: Spreadsheet["LastScanAt"] | null): string {
+    if (!lastScanAt) return "bg-slate-500";
     return "bg-emerald-400";
   }
 
-  function lastScanText(s: Spreadsheet): string {
-    if (!s.LastScanAt) return "never";
+  function lastScanText(lastScanAt: Spreadsheet["LastScanAt"] | null): string {
+    if (!lastScanAt) return "never";
     try {
-      const d = new Date(s.LastScanAt);
+      const d = new Date(lastScanAt);
       const now = new Date();
       const diff = now.getTime() - d.getTime();
       if (diff < 60_000) return "just now";
@@ -222,9 +217,7 @@
 
   <nav class="min-h-0 flex-1 overflow-y-auto px-2 py-4">
     {#if loading}
-      <p class="px-3 py-6 text-center text-xs text-slate-600">
-        Loading\u2026
-      </p>
+      <p class="px-3 py-6 text-center text-xs text-slate-600">Loading\u2026</p>
     {:else if filtered.length === 0}
       <p class="px-3 py-6 text-center text-xs text-slate-600">
         No tracked sheets yet.
@@ -242,10 +235,10 @@
             }
           }}
           class={[
-            "group mb-1 flex w-full cursor-pointer items-center gap-2.5 rounded-md border border-transparent px-2.5 py-2 text-left hover:border-slate-800 hover:bg-slate-800/40 transition-all",
-            selection.value &&
-              selection.value.id === String(s.ID) &&
-              "bg-slate-800",
+            "group mb-1 flex w-full cursor-pointer items-center gap-2.5 rounded-md  px-2.5 py-2 text-left border-l-2 border-l-slate-600 hover:border-l-slate-400 hover:shadow-2xl hover:bg-slate-800/40 transition-all",
+            selectionStore.value &&
+              selectionStore.value.id === String(s.ID) &&
+              "bg-slate-800 border-l-slate-300!",
           ]}
         >
           <VisibilityIcon visibility={s.Visibility as any} />
@@ -253,9 +246,9 @@
             <p class="truncate text-sm text-slate-200">{s.Title}</p>
             <p class="flex items-center gap-1.5 text-xs text-slate-500">
               <span
-                class={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(s)}`}
+                class={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot(s.LastScanAt)}`}
               ></span>
-              {lastScanText(s)}
+              {lastScanText(s.LastScanAt)}
             </p>
           </div>
           <button
@@ -266,7 +259,7 @@
             }}
             title="Remove"
             class="rounded p-1 px-2 font-extrabold text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
-            >\u2715</button
+            >{"\u2715"}</button
           >
         </div>
       {/each}

@@ -3,19 +3,17 @@
   import GraphCanvas from "./components/GraphCanvas.svelte";
   import SidebarPanel from "./components/SidebarPanel.svelte";
   import InspectorPanel from "./components/InspectorPanel.svelte";
-  import { selection } from "./lib/selection.svelte";
+  import { selectionStore } from "./lib/selection.svelte";
 
   let sidebarOpen = $state(true);
 
-
   onMount(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") selection.set(null);
+      if (e.key === "Escape") selectionStore.set(null);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-
 </script>
 
 <div
@@ -43,7 +41,7 @@
     </button>
   {/if}
 
-  {#if !selection.isNull()}
+  {#if !selectionStore.isNull()}
     <InspectorPanel />
   {/if}
 </div>
