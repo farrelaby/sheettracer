@@ -7,6 +7,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 0 — Scaffold cleanup
 
 **Deliverables**
+
 - `go.mod` module renamed to `sheettracer`; bindings regenerate under `frontend/src/bindings/sheettracer`.
 - App metadata in `main.go`: `Name: "SheetTracer"`, `Description`, window title/size.
 - Remove template `GreetService` demo event/time ticker.
@@ -17,6 +18,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 1 — Google OAuth
 
 **Deliverables**
+
 - Google Cloud project + consent screen + Desktop OAuth client (see `docs/GOOGLE_OAUTH.md`).
 - `internal/oauth/`: loopback server, PKCE code exchange, token refresh, keyring-backed token persistence.
 - `internal/db`: bootstrap — connection (WAL + pragmas), `user_version` migrations, `settings` KV repo.
@@ -30,6 +32,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 2 — Add spreadsheet + metadata
 
 **Deliverables**
+
 - `internal/sheets/`: parse Google Sheets URL → id (strip query/hash params); `spreadsheets.get` metadata (title, tabs) + `drive.files.get` (`version`, `modifiedTime`, `shared`, `capabilities`).
 - `internal/db/`: `SpreadsheetRepo` (UpsertByGoogleID, GetByGoogleID, ListTracked, Delete) + `TabRepo` (UpsertAll, ListBySpreadsheet) — sqlx-backed repositories.
 - `SheetsService.Add(url, notes)`: `files.get` first — on error (404 `notFound`) reject with "no access / not found"; on success upsert metadata + `visibility` (via `shared` + `capabilities`), dedup on `google_id`.
@@ -40,6 +43,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 3 — Parallel scanner + graph storage
 
 **Deliverables**
+
 - `internal/scan/`: IMPORTRANGE extractor, chunked `values.batchGet` (FORMULA render, field-masked), worker pool + results channel + single merge writer.
 - Edge delete/insert lifecycle; `scan_cache` writes; `scan_runs` logging.
 - Preflight refreshes `visibility` (same `files.get`); merge resolves external target titles/visibility (cached `files.get`, 404 → `unknown`).
@@ -51,6 +55,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 4 — Graph view
 
 **Deliverables**
+
 - Add Cytoscape.js + `fcose`.
 - `GraphCanvas.svelte`: instance-in-`onMount`, `cy.batch` updates, fan-in node sizing via `mapData`, cluster coloring, external-vs-internal edges, hover labels, focus-on-hover.
 - `NodeDetailPanel.svelte`: imports, fan-in, visibility badge, modified time, open-in-Google, leaf → "Track this tab".
@@ -65,6 +70,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 5 — Cache revalidation + scan triggers
 
 **Deliverables**
+
 - Preflight via `drive.files.get` `version` comparison; skip unchanged workbooks (cache hits).
 - `scan_cache` read/write + fingerprint invalidation.
 - Triggers: manual rescan, rescan-on-launch (background), rescan-on-add.
@@ -75,6 +81,7 @@ Implementation roadmap. Each milestone has deliverables and acceptance criteria.
 ## Milestone 6 — Polish + release
 
 **Deliverables**
+
 - CSP locked down, no `{@html}`, error/empty states, loading states.
 - `docs/CI.md` workflow live: tag → matrix build → GitHub release.
 - README/CHANGELOG up to date; `wails3 build` produces release binaries.

@@ -7,6 +7,7 @@
   import {
     OAuthService,
     SheetsService,
+    ScanService,
   } from "../../bindings/sheettracer/internal/services";
   import type { Spreadsheet } from "../../bindings/sheettracer/internal/db/models";
   import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
@@ -121,6 +122,20 @@
     } catch (e) {
       console.error("Failed to remove:", e);
       toast.error("Failed to remove spreadsheet");
+    }
+  }
+
+  async function scanSpreadsheet(id: number, title: string) {
+    try {
+      toast.info(`Scanning ${title}...`);
+      const result = await ScanService.ScanSpreadsheet(id);
+      // console.log("Scan result:", JSON.stringify(result, null, 2));
+      console.log(result);
+
+      toast.success(`Scanned ${title} — ${result?.tabs?.length ?? 0} tabs`);
+    } catch (e) {
+      console.error("Scan failed:", e);
+      toast.error(`Scan failed: ${e}`);
     }
   }
 
@@ -257,6 +272,16 @@
               {lastScanText(s.LastScanAt)}
             </p>
           </div>
+          <button
+            type="button"
+            onclick={(e) => {
+              e.stopPropagation();
+              scanSpreadsheet(s.ID, s.Title);
+            }}
+            title="Scan"
+            class="rounded p-1 px-2 text-xs text-slate-500 opacity-0 hover:bg-slate-700 hover:text-slate-300 group-hover:opacity-100 cursor-pointer"
+            >{"\u25B6"}</button
+          >
           <button
             type="button"
             onclick={(e) => {
