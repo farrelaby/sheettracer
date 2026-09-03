@@ -150,3 +150,8 @@ func isNotFound(err error) bool {
 
 // ErrNotFound is returned when Drive returns 404 (no access or doesn't exist).
 var ErrNotFound = fmt.Errorf("no access / not found")
+
+func (c *Client) BatchGet(ctx context.Context, spreadsheetID string, tabName string) (*sheets.BatchGetValuesResponse, error) {
+	quotedTab := "'" + tabName + "'"
+	return c.sheetsSvc.Spreadsheets.Values.BatchGet(spreadsheetID).Ranges(quotedTab).ValueRenderOption("FORMULA").Context(ctx).Do()
+}
