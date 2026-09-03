@@ -29,7 +29,7 @@ export function Add(url: string, notes: string): $CancellablePromise<db$0.Spread
 }
 
 /**
- * FetchMetadata is a thin wrapper for testing — calls the Google API directly.
+ * FetchDbMetadata returns spreadsheet metadata from the database.
  */
 export function FetchDbMetadata(spreadsheetID: number): $CancellablePromise<$models.DbMetadata | null> {
     return $Call.ByID(314275568, spreadsheetID);
