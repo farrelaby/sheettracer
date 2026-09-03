@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"sheettracer/internal/keyring"
 	"sheettracer/internal/oauth"
 	"sheettracer/internal/services"
+	"sheettracer/internal/sheets"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -43,6 +46,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
 	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.
@@ -67,13 +71,34 @@ func main() {
 	)
 	app.RegisterService(application.NewService(oauthService))
 
+	oauthClient := oauth.New(clientID(), clientSecret())
+	keyringStore := oauth.NewKeyringStore(kr)
+	clientFactory := services.ClientFactory(func(ctx context.Context) (*sheets.Client, error) {
+		tok, err := keyringStore.Get()
+		if err != nil {
+			return nil, err
+		}
+		if tok == nil {
+			return nil, fmt.Errorf("not connected")
+		}
+		src := oauthClient.Source(ctx, tok, keyringStore)
+		return sheets.NewClient(ctx, src)
+	})
+
 	sheetsService := services.NewSheetsService(
-		oauth.New(clientID(), clientSecret()),
-		oauth.NewKeyringStore(kr),
+		clientFactory,
 		database.NewSpreadsheetRepo(db),
 		database.NewTabRepo(db),
 	)
 	app.RegisterService(application.NewService(sheetsService))
+
+	scanService := services.NewScanService(
+		clientFactory,
+		database.NewSpreadsheetRepo(db),
+		database.NewTabRepo(db),
+		database.NewEdgeRepo(db),
+	)
+	app.RegisterService(application.NewService(scanService))
 
 	menu := createMenu(app)
 	app.Menu.Set(menu)

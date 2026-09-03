@@ -5,55 +5,40 @@ import (
 	"fmt"
 
 	"sheettracer/internal/db"
-	"sheettracer/internal/oauth"
 	"sheettracer/internal/sheets"
-
-	"golang.org/x/oauth2"
 )
 
 // SheetsService exposes spreadsheet management to the frontend. It is a
 // Wails-bound service.
 type SheetsService struct {
-	client          *oauth.Client
-	store           oauth.TokenStore
+	factory         ClientFactory
 	spreadsheetRepo *db.SpreadsheetRepo
 	tabRepo         *db.TabRepo
-	sheetsClient    *sheets.Client
+	client          *sheets.Client // lazily created on first call
 }
 
 func NewSheetsService(
-	client *oauth.Client,
-	store oauth.TokenStore,
+	factory ClientFactory,
 	spreadsheetRepo *db.SpreadsheetRepo,
 	tabRepo *db.TabRepo,
 ) *SheetsService {
 	return &SheetsService{
-		client:          client,
-		store:           store,
+		factory:         factory,
 		spreadsheetRepo: spreadsheetRepo,
 		tabRepo:         tabRepo,
-		sheetsClient:    nil,
 	}
 }
 
-func (s *SheetsService) getorCreateClient(ctx context.Context) (*sheets.Client, error) {
-	if s.sheetsClient != nil {
-		return s.sheetsClient, nil
+func (s *SheetsService) getClient(ctx context.Context) (*sheets.Client, error) {
+	if s.client != nil {
+		return s.client, nil
 	}
-
-	src, err := s.tokenSource()
+	c, err := s.factory(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	client, err := sheets.NewClient(ctx, src)
-	if err != nil {
-		return nil, err
-	}
-
-	s.sheetsClient = client
-
-	return client, nil
+	s.client = c
+	return c, nil
 }
 
 // Add fetches metadata for the given Google Sheets URL, persists it, and
@@ -67,7 +52,7 @@ func (s *SheetsService) Add(url string, notes string) (*db.Spreadsheet, error) {
 
 	ctx := context.Background()
 
-	client, err := s.getorCreateClient(ctx)
+	client, err := s.getClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +73,6 @@ func (s *SheetsService) Add(url string, notes string) (*db.Spreadsheet, error) {
 	}
 
 	id, err := s.spreadsheetRepo.UpsertByGoogleID(sp)
-
 	if err != nil {
 		return nil, fmt.Errorf("[persist spreadsheet]: %w", err)
 	}
@@ -121,18 +105,6 @@ func (s *SheetsService) Remove(id int64) error {
 	return s.spreadsheetRepo.Delete(id)
 }
 
-// tokenSource returns a fresh OAuth2 token source, or an error if not connected.
-func (s *SheetsService) tokenSource() (oauth2.TokenSource, error) {
-	tok, err := s.store.Get()
-	if err != nil {
-		return nil, err
-	}
-	if tok == nil {
-		return nil, fmt.Errorf("not connected")
-	}
-	return s.client.Source(context.Background(), tok, s.store), nil
-}
-
 type DbMetadata struct {
 	SpreadsheetID string
 	Title         string
@@ -142,7 +114,7 @@ type DbMetadata struct {
 	Visibility    string
 }
 
-// FetchMetadata is a thin wrapper for testing — calls the Google API directly.
+// FetchDbMetadata returns spreadsheet metadata from the database.
 func (s *SheetsService) FetchDbMetadata(spreadsheetID int) (*DbMetadata, error) {
 	ss, err := s.spreadsheetRepo.GetSpreadsheetByID(spreadsheetID)
 	if err != nil {
@@ -162,5 +134,4 @@ func (s *SheetsService) FetchDbMetadata(spreadsheetID int) (*DbMetadata, error) 
 		ModifiedTime:  ss.ModifiedTime,
 		Tabs:          tt,
 	}, nil
-
 }
