@@ -18,6 +18,6 @@ import * as $models from "./models.js";
  * ScanSpreadsheet fetches formula data from all tabs of a spreadsheet.
  * Returns raw cell values so we can inspect the BatchGet response structure.
  */
-export function ScanSpreadsheet(spreadsheetID: number): $CancellablePromise<$models.ScanResult | null> {
+export function ScanSpreadsheet(spreadsheetID: number): $CancellablePromise<$models.ScanSummary | null> {
     return $Call.ByID(1279636441, spreadsheetID);
 }

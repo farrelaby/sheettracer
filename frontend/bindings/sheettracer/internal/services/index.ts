@@ -14,6 +14,5 @@ export type {
     AccountInfo,
     AuthState,
     DbMetadata,
-    ScanResult,
-    TabResult
+    ScanSummary
 } from "./models.js";

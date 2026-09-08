@@ -33,21 +33,9 @@ export interface DbMetadata {
     "Visibility": string;
 }
 
-/**
- * ScanResult holds all tab results for a spreadsheet.
- */
-export interface ScanResult {
+export interface ScanSummary {
     "spreadsheetId": string;
     "title": string;
-    "tabs": TabResult[] | null;
-}
-
-/**
- * TabResult holds the raw BatchGet response for one tab.
- */
-export interface TabResult {
-    "tabName": string;
-    "tabId": number;
-    "range": string;
-    "values": (any[] | null)[] | null;
+    "tabsScanned": number;
+    "edgesFound": number;
 }

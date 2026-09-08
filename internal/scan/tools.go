@@ -126,10 +126,9 @@ func isFormulaStrict(val string) bool {
 }
 
 func ScanValues(tab db.Tab, val [][]interface{}) []db.Edge {
-	fmt.Printf("[SpreadsheetID]:%v\n", tab.SpreadsheetID)
-	fmt.Printf("[Tab]:%v (%v)\n", tab.Title, tab.TabID)
+	fmt.Printf("[TabIDScan]:%v\n", tab.TabID)
 
-	e := []db.Edge{}
+	var e []db.Edge
 	for irow, row := range val {
 		for icol, col := range row {
 			s, ok := col.(string)
@@ -144,20 +143,24 @@ func ScanValues(tab db.Tab, val [][]interface{}) []db.Edge {
 				fmt.Errorf("[Formula parse]:%v\n", err)
 			}
 			src_cell := toA1Notation(irow, icol)
-			fmt.Printf("[Cell]:%v\n", src_cell)
+			// fmt.Printf("[Cell]:%v\n", src_cell)
 			for _, target := range extracts {
-				fmt.Printf("	[Target]=> [ID]:%v;[Range]:%v\n", target.SpreadsheetID, target.Range)
+				// fmt.Printf("	[Target]=> [ID]:%v;[Range]:%v\n", target.SpreadsheetID, target.Range)
+				e = append(e, db.Edge{
+					SourceSpreadsheet: tab.SpreadsheetID,
+					SourceTabID:       tab.TabID,
+					SourceCell:        src_cell,
+					TargetGoogleID:    target.SpreadsheetID,
+					TargetRange:       &target.Range,
+				})
 			}
-			fmt.Println()
-			e = append(e, db.Edge{
-				SourceSpreadsheet: tab.SpreadsheetID,
-				SourceTabID:       tab.TabID,
 
-				SourceCell: src_cell,
-			})
+			// fmt.Printf("[extracts]: %v\n", extracts)
+			// fmt.Println("")
 			_ = src_cell
 		}
 	}
 
+	// fmt.Printf("\n[e]: %v\n", e)
 	return e
 }
