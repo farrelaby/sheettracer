@@ -1,17 +1,13 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import VisibilityIcon from "./VisibilityIcon.svelte";
   import { fly } from "svelte/transition";
-  import { selectionStore, type Selection } from "../lib/selection.svelte";
+  import { selectionStore, type Selection } from "@/lib/selection.svelte";
   import OAuthStatus from "./OAuthStatus.svelte";
-  import {
-    OAuthService,
-    SheetsService,
-    ScanService,
-  } from "../../bindings/sheettracer/internal/services";
-  import type { Spreadsheet } from "../../bindings/sheettracer/internal/db/models";
+  import { OAuthService } from "../../bindings/sheettracer/internal/services";
   import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
-  import { toast } from "@/lib/toast.svelte";
+  import { useSpreadsheetActions } from "@/lib/hooks/spreadsheetActions.svelte";
+  import { useSidebarWidth } from "@/lib/hooks/sidebarWidth.svelte";
+  import { lastScanText, statusDot } from "@/lib/utils/format";
 
   interface Props {
     onClose: () => void;
@@ -19,25 +15,19 @@
 
   let { onClose }: Props = $props();
 
-  const MIN = 260;
-  const MAX = 480;
+  const { addSheet, removeSheet, scanSpreadsheet } = useSpreadsheetActions();
+  // const addSheet
+  // const removeSheet
+  // const scanSpreadsheet
+  const sidebar = useSidebarWidth();
 
-  function initialWidth(): number {
-    const saved = Number(localStorage.getItem("st.sidebarWidth"));
-    return Number.isFinite(saved) ? Math.min(MAX, Math.max(MIN, saved)) : 340;
-  }
-
-  let width = $state(initialWidth());
-  let dragging = $state(false);
-
-  let spreadsheets = $derived(spreadsheetStore.value);
-  let loading = $state(true);
   let query = $state("");
   let linkInput = $state("");
-  let addError = $state("");
-  let adding = $state(false);
   let settingsOpen = $state(false);
   let rescanOnLaunch = $state(true);
+
+  let spreadsheets = $derived(spreadsheetStore.value);
+  let loading = $derived(spreadsheetStore.loading);
 
   const filtered = $derived(
     spreadsheets.filter((s) =>
@@ -45,125 +35,19 @@
     ),
   );
 
-  onMount(async () => {
-    try {
-      spreadsheetStore.set((await SheetsService.List()) ?? []);
-    } catch (e) {
-      console.error("Failed to load spreadsheets:", e);
-      toast.error("Failed to load spreadsheets");
-    } finally {
-      loading = false;
-    }
-  });
-
-  function clampWidth(w: number): number {
-    return Math.min(MAX, Math.max(MIN, w));
-  }
-
-  function onHandleDown(e: PointerEvent) {
-    dragging = true;
-    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-  }
-
-  function onHandleMove(e: PointerEvent) {
-    if (dragging) width = clampWidth(e.clientX);
-  }
-
-  function onHandleUp() {
-    if (!dragging) return;
-    dragging = false;
-    localStorage.setItem("st.sidebarWidth", String(width));
-  }
-
   function onSelect(s: Selection) {
     selectionStore.set(s);
   }
 
-  async function addSheet() {
-    const value = linkInput.trim();
-    if (!value) return;
-    if (!value.startsWith("http")) {
-      addError =
-        "Enter a Google Sheets link, e.g. https://docs.google.com/spreadsheets/d/\u2026";
-      return;
-    }
-    addError = "";
-    adding = true;
-    try {
-      const sp = await SheetsService.Add(value, "");
-      if (sp) {
-        spreadsheetStore.append(sp);
-        toast.success("Spreadsheet added");
-      }
-      linkInput = "";
-    } catch (e: any) {
-      const msg = String(e?.message || e);
-      if (
-        msg.includes("no access") ||
-        msg.includes("not found") ||
-        msg.includes("404")
-      ) {
-        addError =
-          "Could not access this sheet \u2014 no access, or it doesn\u2019t exist.";
-      } else {
-        addError = msg || "Failed to add spreadsheet.";
-      }
-    } finally {
-      adding = false;
-    }
-  }
-
-  async function remove(id: number) {
-    try {
-      // await SheetsService.Remove(id);
-      // spreadsheetStore.remove(id);
-      toast.setPosition("top-center");
-      toast.success("Spreadsheet removed");
-    } catch (e) {
-      console.error("Failed to remove:", e);
-      toast.error("Failed to remove spreadsheet");
-    }
-  }
-
-  async function scanSpreadsheet(id: number, title: string) {
-    try {
-      toast.info(`Scanning ${title}...`);
-      const result = await ScanService.ScanSpreadsheet(id);
-      // console.log("Scan result:", JSON.stringify(result, null, 2));
-      console.log(result);
-
-      toast.success(`Scanned ${title} — ${result?.tabs?.length ?? 0} tabs`);
-    } catch (e) {
-      console.error("Scan failed:", e);
-      toast.error(`Scan failed: ${e}`);
-    }
-  }
-
-  function statusDot(lastScanAt: Spreadsheet["LastScanAt"] | null): string {
-    if (!lastScanAt) return "bg-slate-500";
-    return "bg-emerald-400";
-  }
-
-  function lastScanText(lastScanAt: Spreadsheet["LastScanAt"] | null): string {
-    if (!lastScanAt) return "never";
-    try {
-      const d = new Date(lastScanAt);
-      const now = new Date();
-      const diff = now.getTime() - d.getTime();
-      if (diff < 60_000) return "just now";
-      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
-      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
-      return `${Math.floor(diff / 86_400_000)} d ago`;
-    } catch {
-      return "unknown";
-    }
+  async function handleAdd() {
+    if (await addSheet(linkInput)) linkInput = "";
   }
 </script>
 
 <aside
   transition:fly={{ x: -200, duration: 200 }}
   class="absolute inset-y-0 left-0 z-20 flex flex-col border-r border-slate-800 bg-slate-900/85 backdrop-blur"
-  style={`width: ${width}px`}
+  style={`width: ${sidebar.width}px`}
 >
   <header class="flex items-center justify-between px-4 pb-3 pt-4">
     <h1
@@ -209,22 +93,20 @@
   <form
     onsubmit={(e) => {
       e.preventDefault();
-      addSheet();
+      handleAdd();
     }}
     class="mx-2 mb-2 border border-dashed rounded p-2"
   >
     <input
       bind:value={linkInput}
-      placeholder="Paste a Google Sheets link\u2026"
-      disabled={adding}
-      class="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-purple-500 disabled:opacity-50"
+      placeholder="Paste a Google Sheets link"
+      class="w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-1.5 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-purple-500"
     />
-    {#if addError}<p class="mt-1.5 text-xs text-red-400">{addError}</p>{/if}
     <button
       type="submit"
-      disabled={!linkInput.trim() || adding}
+      disabled={!linkInput.trim()}
       class="mt-2 w-full rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-40"
-      >{adding ? "Adding \u2026" : "Add spreadsheet"}</button
+      >Add spreadsheet</button
     >
   </form>
 
@@ -286,7 +168,7 @@
             type="button"
             onclick={(e) => {
               e.stopPropagation();
-              remove(s.ID);
+              removeSheet(s.ID);
             }}
             title="Remove"
             class="rounded p-1 px-2 font-extrabold text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
@@ -350,13 +232,10 @@
   <div
     role="separator"
     aria-orientation="vertical"
-    onpointerdown={onHandleDown}
-    onpointermove={onHandleMove}
-    onpointerup={onHandleUp}
-    onpointercancel={onHandleUp}
+    onpointerdown={sidebar.onHandleDown}
+    onpointermove={sidebar.onHandleMove}
+    onpointerup={sidebar.onHandleUp}
+    onpointercancel={sidebar.onHandleUp}
     class="absolute inset-y-0 -right-1.5 z-10 w-3 cursor-ew-resize"
   ></div>
 </aside>
-
-<style>
-</style>

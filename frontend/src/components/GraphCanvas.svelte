@@ -1,134 +1,16 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import cytoscape from "cytoscape";
-  import fcose from "cytoscape-fcose";
-  import { spreadsheetStore } from "@/lib/spreadsheets.svelte";
-  import { selectionStore } from "@/lib/selection.svelte";
+  import type cytoscape from "cytoscape";
+  import { useDataLoad, useGraphMount, useGraphSync } from "@/lib/hooks/graph.svelte";
 
   let container: HTMLDivElement | undefined = $state();
-  let cy: cytoscape.Core | undefined;
+  let cy = $state<cytoscape.Core | undefined>(undefined);
 
-  onMount(() => {
-    if (!container) return;
-    cytoscape.use(fcose);
-    cy = cytoscape({
-      container,
-      elements: [],
-      style: [
-        {
-          selector: "node",
-          style: {
-            "background-color": "#1e293b",
-            "border-width": 2,
-            "border-color": "#64748b",
-            label: "data(label)",
-            color: "#e2e8f0",
-            "font-size": 11,
-            "text-valign": "bottom",
-            "text-margin-y": 8,
-            "text-wrap": "wrap",
-            "text-max-width": 100,
-            shape: "round-rectangle",
-            width: "mapData(fanIn, 0, 4, 34, 110)",
-            height: "mapData(fanIn, 0, 4, 34, 110)",
-          },
-        },
-        { selector: "node.editor", style: { "border-color": "#34d399" } },
-        { selector: "node.shared", style: { "border-color": "#fbbf24" } },
-        { selector: "node.private", style: { "border-color": "#f87171" } },
-        { selector: "node.unknown", style: { "border-color": "#64748b" } },
-        {
-          selector: "node.external",
-          style: {
-            "background-color": "#0f172a",
-            "border-style": "dashed",
-            color: "#94a3b8",
-            "text-opacity": 0.7,
-          },
-        },
-        {
-          selector: "node.ehover",
-          style: {
-            cursor: "pointer",
-            "text-opacity": 0.9,
-            opacity: 0.7,
-          },
-        },
-        {
-          selector: "node:selected",
-          style: { "border-width": 4, "border-color": "#a78bfa" },
-        },
-        {
-          selector: "edge",
-          style: {
-            width: "mapData(formulaCount, 1, 7, 1, 4)",
-            "line-color": "#334155",
-            "target-arrow-color": "#334155",
-            "target-arrow-shape": "triangle",
-            "curve-style": "bezier",
-            label: "data(label)",
-            color: "#94a3b8",
-            "font-size": 9,
-            "text-rotation": "autorotate",
-            "text-background-color": "#06070f",
-            "text-background-opacity": 0.8,
-            "text-background-padding": 2,
-            "text-opacity": 0,
-          },
-        },
-        {
-          selector: "edge.ehover",
-          style: { "text-opacity": 1, cursor: "pointer" },
-        },
-        {
-          selector: "edge:selected",
-          style: { "line-color": "#a78bfa", "target-arrow-color": "#a78bfa" },
-        },
-      ] as cytoscape.StylesheetStyle[],
-      layout: {
-        name: "fcose",
-        animate: false,
-        idealEdgeLength: 110,
-        nodeRepulsion: () => 4800,
-        padding: 40,
-      } as unknown as cytoscape.LayoutOptions,
-      minZoom: 0.2,
-      maxZoom: 3,
-      wheelSensitivity: 2,
-    });
-
-    cy.on("tap", "node,edge", (evt) => {
-      const el = evt.target as cytoscape.SingularElementReturnValue;
-      // onSelect({ type: el.isNode() ? "node" : "edge", id: el.id() });
-      selectionStore.set({ type: el.isNode() ? "node" : "edge", id: el.id() });
-    });
-
-    cy.on("tap", (evt) => {
-      if ((evt.target as unknown) === cy) selectionStore.set(null);
-    });
-    cy.on("mouseover", "node", (evt) => evt.target.addClass("ehover"));
-    cy.on("mouseout", "node", (evt) => evt.target.removeClass("ehover"));
-
-    cy.on("mouseover", "edge", (evt) => evt.target.addClass("ehover"));
-    cy.on("mouseout", "edge", (evt) => evt.target.removeClass("ehover"));
-  });
-
-  $effect(() => {
-    if (!cy) return;
-    const elements = spreadsheetStore.graphElements;
-
-    cy.elements().remove();
-    if (elements.length > 0) {
-      cy.add(elements);
-      cy.layout({
-        name: "fcose",
-        animate: false,
-        idealEdgeLength: 110,
-        nodeRepulsion: () => 4800,
-        padding: 40,
-      } as unknown as cytoscape.LayoutOptions).run();
-    }
-  });
+  useDataLoad();
+  useGraphMount(
+    () => container,
+    (v) => cy = v,
+  );
+  useGraphSync(() => cy);
 </script>
 
 <div

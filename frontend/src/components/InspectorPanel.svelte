@@ -1,21 +1,16 @@
 <script lang="ts">
   import VisibilityIcon from "./VisibilityIcon.svelte";
   import { selectionStore, type Selection } from "@/lib/selection.svelte";
-
-  import {
-    SheetsService,
-    type DbMetadata as Metadata,
-  } from "../../bindings/sheettracer/internal/services";
+  import { useInspectorData } from "@/lib/hooks/inspectorData.svelte";
+  import { formatDateTime } from "@/lib/utils/format";
 
   import { Browser } from "@wailsio/runtime";
 
-  const currentSelection = $derived(selectionStore.value);
+  const inspector = useInspectorData();
+  let node = $derived(inspector.state.node);
+  let close = $derived(inspector.close);
 
-  let node = $derived(
-    selectionStore.value?.type === "node"
-      ? await SheetsService.FetchDbMetadata(Number(selectionStore.value.id))
-      : null,
-  );
+  const currentSelection = $derived(selectionStore.value);
 
   const visibilityLabel: Record<string, string> = {
     public: "Public",
@@ -24,48 +19,20 @@
     unknown: "Unknown",
   };
 
-  function formatDateTime(iso: string): string {
-    try {
-      const d = new Date(iso);
-      const now = new Date();
-      const diff = now.getTime() - d.getTime();
-      if (diff < 60_000) return "just now";
-      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
-      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} h ago`;
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return iso;
-    }
-  }
-
   function onSelect(s: Selection) {
     selectionStore.set(s);
   }
-
-  function onClose() {
-    selectionStore.set(null);
-  }
-
-  $effect(() => {
-    console.log(currentSelection);
-
-    console.log(node);
-  });
 </script>
 
 <aside
-  class="absolute inset-y-0 right-0 z-20 flex w-80 flex-col border-l border-slate-800 bg-slate-900/85 backdrop-blur"
+  class="absolute inset-y-0 right-0 z-20 flex w-64 flex-col border-l border-slate-800 bg-slate-900/85 backdrop-blur"
 >
   <header class="flex items-center justify-between px-4 pb-2 pt-3">
     <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">
       {currentSelection?.type === "node" ? "Spreadsheet" : "Dependency"}
     </p>
     <button
-      onclick={onClose}
+      onclick={close}
       title="Close"
       class="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
     >
@@ -82,12 +49,7 @@
   </header>
 
   <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-    <!-- {#if loading}
-      <div class="flex items-center justify-center py-8">
-        <p class="text-xs text-slate-500">Loading...</p>
-      </div> -->
     {#if node}
-      <!-- ERROR: node title, etc wont refresh when id changed -->
       <h2 class="text-base font-semibold text-slate-100">{node.Title}</h2>
       <div class="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
         <VisibilityIcon visibility={node.Visibility as any} />
