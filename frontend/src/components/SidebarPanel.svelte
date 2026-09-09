@@ -8,6 +8,7 @@
   import { useSpreadsheetActions } from "@/lib/hooks/spreadsheetActions.svelte";
   import { useSidebarWidth } from "@/lib/hooks/sidebarWidth.svelte";
   import { lastScanText, statusDot } from "@/lib/utils/format";
+  import ConfirmDialog from "./ui/ConfirmDialog.svelte";
 
   interface Props {
     onClose: () => void;
@@ -16,15 +17,25 @@
   let { onClose }: Props = $props();
 
   const { addSheet, removeSheet, scanSpreadsheet } = useSpreadsheetActions();
-  // const addSheet
-  // const removeSheet
-  // const scanSpreadsheet
+
   const sidebar = useSidebarWidth();
 
   let query = $state("");
   let linkInput = $state("");
   let settingsOpen = $state(false);
   let rescanOnLaunch = $state(true);
+  let isOpenConfirmDialog = $state(false);
+  let pendingRemoveId = $state<number | null>(null);
+
+  function askRemove(id: number) {
+    pendingRemoveId = id;
+    isOpenConfirmDialog = true;
+  }
+
+  function confirmRemove() {
+    if (pendingRemoveId !== null) removeSheet(pendingRemoveId);
+    pendingRemoveId = null;
+  }
 
   let spreadsheets = $derived(spreadsheetStore.value);
   let loading = $derived(spreadsheetStore.loading);
@@ -168,7 +179,7 @@
             type="button"
             onclick={(e) => {
               e.stopPropagation();
-              removeSheet(s.ID);
+              askRemove(s.ID);
             }}
             title="Remove"
             class="rounded p-1 px-2 font-extrabold text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
@@ -239,3 +250,19 @@
     class="absolute inset-y-0 -right-1.5 z-10 w-3 cursor-ew-resize"
   ></div>
 </aside>
+
+<ConfirmDialog
+  bind:open={isOpenConfirmDialog}
+  danger
+  confirmLabel="Remove"
+  onConfirm={confirmRemove}
+>
+  {#snippet title()}
+    Remove spreadsheet?
+  {/snippet}
+
+  {#snippet description()}
+    This removes the sheet from SheetTracer. Scanned data for it will be
+    discarded.
+  {/snippet}
+</ConfirmDialog>
