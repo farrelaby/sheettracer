@@ -3,6 +3,7 @@ import { type Spreadsheet } from "../../bindings/sheettracer/internal/db";
 
 class SpreadsheetState {
   value = $state<Spreadsheet[]>([]);
+  loading = $state(false);
 
   set(value: Spreadsheet[]) {
     this.value = value;
@@ -28,6 +29,10 @@ class SpreadsheetState {
       },
       classes: `${s.IsTracked ? "tracked" : "external"} ${s.Visibility}`,
     }));
+  }
+
+  setLoading(loading: boolean) {
+    this.loading = loading;
   }
 }
 
