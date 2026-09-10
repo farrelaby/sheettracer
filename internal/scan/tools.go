@@ -80,7 +80,7 @@ func parseImportRangeArguments(tokens []efp.Token, startIdx int) (ImportRangeTar
 		c := cleanArgument(args[0])
 		id, err := sheets.ParseID(c)
 		if err != nil {
-			fmt.Errorf("[ParseID]:%v", err)
+			fmt.Printf("[ParseID]:%v\n", err)
 		}
 		call.SpreadsheetID = id
 	}
@@ -140,7 +140,7 @@ func ScanValues(tab db.Tab, val [][]interface{}) []db.Edge {
 			}
 			extracts, err := ExtractImportRanges(s)
 			if err != nil {
-				fmt.Errorf("[Formula parse]:%v\n", err)
+				fmt.Printf("[Formula parse]:%v\n", err)
 			}
 			src_cell := toA1Notation(irow, icol)
 			// fmt.Printf("[Cell]:%v\n", src_cell)
