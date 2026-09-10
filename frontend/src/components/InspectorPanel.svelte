@@ -2,7 +2,7 @@
   import VisibilityIcon from "./VisibilityIcon.svelte";
   import { selectionStore, type Selection } from "@/lib/selection.svelte";
   import { useInspectorData } from "@/lib/hooks/inspectorData.svelte";
-  import { formatDateTime } from "@/lib/utils/format";
+  import { formatDateTime, lastScanText } from "@/lib/utils/format";
 
   import { Browser } from "@wailsio/runtime";
 
@@ -64,6 +64,10 @@
         <div class="flex justify-between">
           <dt class="text-slate-500">Version</dt>
           <dd class="text-slate-300">{node.Version}</dd>
+        </div>
+        <div class="flex justify-between">
+          <dt class="text-slate-500">Last scan</dt>
+          <dd class="text-slate-300">{lastScanText(node.LastScanAt)}</dd>
         </div>
       </dl>
 

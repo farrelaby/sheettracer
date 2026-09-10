@@ -4,6 +4,7 @@ import {
   type DbMetadata as Metadata,
 } from "../../../bindings/sheettracer/internal/services";
 import { selectionStore } from "../selection.svelte";
+import { scanRefresh } from "../scanRefresh.svelte";
 
 export function useInspectorData() {
   // let node = $state<Metadata | null>(null);
@@ -15,6 +16,9 @@ export function useInspectorData() {
   const sel = $derived(selectionStore.value);
 
   $effect(() => {
+    // Subscribed (not otherwise used) so a completed scan refetches the
+    // open node without requiring reselect.
+    const revision = scanRefresh.version;
     if (!sel || sel.type !== "node") {
       state.node = null;
       return;
