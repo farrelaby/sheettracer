@@ -86,6 +86,13 @@ func (r *SpreadsheetRepo) UpdateVisibility(id int64, visibility string) error {
 	return err
 }
 
+// UpdateLastScanAt stamps when a spreadsheet was last successfully scanned.
+// It drives the per-sheet "last scan" display; sheets never scanned stay NULL.
+func (r *SpreadsheetRepo) UpdateLastScanAt(id int64, t time.Time) error {
+	_, err := r.db.Exec(`UPDATE spreadsheets SET last_scan_at = ? WHERE id = ?`, t, id)
+	return err
+}
+
 func (r *SpreadsheetRepo) GetSpreadsheetByID(id int) (Spreadsheet, error) {
 	var ss Spreadsheet
 	err := r.db.Get(&ss,
