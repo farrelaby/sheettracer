@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"sheettracer/internal/db"
 	"sheettracer/internal/sheets"
@@ -112,6 +113,7 @@ type DbMetadata struct {
 	Version       string
 	ModifiedTime  string
 	Visibility    string
+	LastScanAt    *time.Time
 }
 
 // FetchDbMetadata returns spreadsheet metadata from the database.
@@ -132,6 +134,7 @@ func (s *SheetsService) FetchDbMetadata(spreadsheetID int) (*DbMetadata, error) 
 		Visibility:    ss.Visibility,
 		Version:       ss.Version,
 		ModifiedTime:  ss.ModifiedTime,
+		LastScanAt:    ss.LastScanAt,
 		Tabs:          tt,
 	}, nil
 }
