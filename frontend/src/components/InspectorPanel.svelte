@@ -5,12 +5,36 @@
   import { formatDateTime, lastScanText } from "@/lib/utils/format";
 
   import { Browser } from "@wailsio/runtime";
+  import { useSpreadsheetActions } from "@/lib/hooks/spreadsheetActions.svelte";
 
   const inspector = useInspectorData();
   let node = $derived(inspector.state.node);
   let close = $derived(inspector.close);
 
   const currentSelection = $derived(selectionStore.value);
+
+  const { scanSpreadsheet, removeSheet, isScanning } =
+    useSpreadsheetActions();
+
+  // The inspector's metadata carries the Google ID, not the DB row ID —
+  // the selection id is the DB ID the scan/remove services need.
+  let spreadsheetId = $derived(
+    currentSelection?.type === "node" ? Number(currentSelection.id) : NaN,
+  );
+  let scanning = $derived(
+    Number.isFinite(spreadsheetId) ? isScanning(spreadsheetId) : false,
+  );
+
+  async function handleRescan() {
+    if (!node || !Number.isFinite(spreadsheetId) || scanning) return;
+    await scanSpreadsheet(spreadsheetId, node.Title);
+  }
+
+  async function handleRemove() {
+    if (!Number.isFinite(spreadsheetId)) return;
+    await removeSheet(spreadsheetId);
+    close();
+  }
 
   const visibilityLabel: Record<string, string> = {
     public: "Public",
@@ -97,10 +121,30 @@
           >Open in Google</button
         >
         <button
-          class="flex-1 rounded-md border border-slate-700 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
-          >Rescan</button
+          onclick={handleRescan}
+          disabled={scanning}
+          aria-busy={scanning}
+          title={scanning ? "Scanning…" : "Rescan"}
+          class="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-slate-700 px-2 py-1.5 text-xs text-slate-300 hover:bg-slate-800 disabled:cursor-wait disabled:opacity-60"
+          >
+          {#if scanning}
+            <svg
+              class="h-3 w-3 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+              ><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg
+            >
+            Scanning…
+          {:else}
+            Rescan
+          {/if}</button
         >
         <button
+          onclick={handleRemove}
           class="rounded-md border border-red-900/50 px-2 py-1.5 text-xs text-red-400 hover:bg-red-950/40"
           >Remove</button
         >
