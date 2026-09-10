@@ -31,6 +31,7 @@ export interface DbMetadata {
     "Version": string;
     "ModifiedTime": string;
     "Visibility": string;
+    "LastScanAt": string | null;
 }
 
 export interface ScanSummary {

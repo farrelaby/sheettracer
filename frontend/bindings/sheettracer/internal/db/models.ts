@@ -22,3 +22,18 @@ export interface Tab {
     "Title": string;
     "Idx": number;
 }
+
+/**
+ * TriggeredBy records what kicked off a scan run.
+ * CHECK (manual, launch, add) in migrations/0001_init.sql.
+ */
+export enum TriggeredBy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    TriggerManual = "manual",
+    TriggerLaunch = "launch",
+    TriggerAdd = "add",
+};

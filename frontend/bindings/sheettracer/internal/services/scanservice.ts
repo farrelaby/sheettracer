@@ -12,12 +12,16 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as db$0 from "../db/models.js";
+
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
  * ScanSpreadsheet fetches formula data from all tabs of a spreadsheet.
  * Returns raw cell values so we can inspect the BatchGet response structure.
  */
-export function ScanSpreadsheet(spreadsheetID: number): $CancellablePromise<$models.ScanSummary | null> {
-    return $Call.ByID(1279636441, spreadsheetID);
+export function ScanSpreadsheet(spreadsheetID: number, trigger: db$0.TriggeredBy): $CancellablePromise<$models.ScanSummary | null> {
+    return $Call.ByID(1279636441, spreadsheetID, trigger);
 }
