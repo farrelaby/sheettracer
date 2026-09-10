@@ -150,6 +150,24 @@ export function useGraphSync(
     if (!cy) return;
     const elements = spreadsheetStore.graphElements;
 
+    const existingIds = new Set(cy.nodes().map((n) => n.id()));
+    const nextIds = new Set(elements.map((e) => e.data.id as string));
+    const sameStructure =
+      existingIds.size === nextIds.size &&
+      [...nextIds].every((id) => existingIds.has(id));
+
+    // Same nodes, new data (e.g. after a scan): update in place so dragged
+    // positions and viewport survive.
+    if (sameStructure) {
+      for (const el of elements) {
+        const node = cy.getElementById(el.data.id as string);
+        node.data(el.data);
+        node.removeClass("tracked external private shared editor unknown");
+        node.addClass(el.classes as string);
+      }
+      return;
+    }
+
     cy.elements().remove();
     if (elements.length > 0) {
       cy.add(elements);
