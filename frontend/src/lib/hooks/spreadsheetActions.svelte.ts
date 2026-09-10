@@ -2,8 +2,9 @@ import {
   SheetsService,
   ScanService,
 } from "../../../bindings/sheettracer/internal/services";
-import type { Spreadsheet } from "../../../bindings/sheettracer/internal/db/models";
+import { TriggeredBy } from "../../../bindings/sheettracer/internal/db/models";
 import { spreadsheetStore } from "../spreadsheets.svelte";
+import { scanRefresh } from "../scanRefresh.svelte";
 import { toast } from "../toast.svelte";
 
 export function useSpreadsheetActions() {
@@ -55,7 +56,15 @@ export function useSpreadsheetActions() {
   async function scanSpreadsheet(id: number, title: string) {
     try {
       toast.info(`Scanning ${title}...`);
-      const result = await ScanService.ScanSpreadsheet(id);
+      const result = await ScanService.ScanSpreadsheet(
+        id,
+        TriggeredBy.TriggerManual,
+      );
+      // The scan stamps last_scan_at server-side; reload the store so the
+      // sidebar/graph pick it up, and bump the refresh revision so an open
+      // inspector refetches without requiring reselect.
+      spreadsheetStore.set((await SheetsService.List()) ?? []);
+      scanRefresh.bump();
       toast.success(`Scanned ${title} \u2014 ${result?.tabsScanned ?? 0} tabs`);
     } catch (e) {
       console.error("Scan failed:", e);
