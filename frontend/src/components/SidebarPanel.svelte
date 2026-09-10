@@ -16,7 +16,8 @@
 
   let { onClose }: Props = $props();
 
-  const { addSheet, removeSheet, scanSpreadsheet } = useSpreadsheetActions();
+  const { addSheet, removeSheet, scanSpreadsheet, isScanning } =
+    useSpreadsheetActions();
 
   const sidebar = useSidebarWidth();
 
@@ -171,9 +172,42 @@
               e.stopPropagation();
               scanSpreadsheet(s.ID, s.Title);
             }}
-            title="Scan"
-            class="rounded p-1 px-2 text-xs text-slate-500 opacity-0 hover:bg-slate-700 hover:text-slate-300 group-hover:opacity-100 cursor-pointer"
-            >{"\u25B6"}</button
+            title={isScanning(s.ID) ? "Scanning…" : "Scan"}
+            disabled={isScanning(s.ID)}
+            class="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-slate-700 hover:text-slate-300 group-hover:opacity-100 cursor-pointer disabled:cursor-wait disabled:opacity-100"
+            aria-busy={isScanning(s.ID)}
+            aria-label={isScanning(s.ID)
+              ? `Scanning ${s.Title}…`
+              : `Scan ${s.Title}`}
+          >
+            {#if isScanning(s.ID)}
+              <svg
+                class="h-3.5 w-3.5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                aria-hidden="true"
+                ><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg
+              >
+            {:else}
+              <svg
+                class="h-3.5 w-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                ><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path
+                  d="M21 3v5h-5"
+                /><path
+                  d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"
+                /><path d="M8 16H3v5" /></svg
+              >
+            {/if}</button
           >
           <button
             type="button"
@@ -182,8 +216,20 @@
               askRemove(s.ID);
             }}
             title="Remove"
-            class="rounded p-1 px-2 font-extrabold text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
-            >{"\u2715"}</button
+            aria-label={`Remove ${s.Title}`}
+            class="inline-flex h-6 w-6 items-center justify-center rounded text-slate-500 opacity-0 hover:bg-red-700 hover:text-white group-hover:opacity-100 cursor-pointer"
+          >
+            <svg
+              class="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              ><path d="M18 6 6 18M6 6l12 12" /></svg
+            ></button
           >
         </div>
       {/each}
