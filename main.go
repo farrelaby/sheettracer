@@ -97,6 +97,8 @@ func main() {
 		database.NewSpreadsheetRepo(db),
 		database.NewTabRepo(db),
 		database.NewEdgeRepo(db),
+		database.NewScanRunRepo(db),
+		database.NewScanCacheRepo(db),
 	)
 	app.RegisterService(application.NewService(scanService))
 
