@@ -52,7 +52,9 @@ func (s *OAuthService) Status() (*AuthState, error) {
 	}
 	refreshed, err := s.client.Source(context.Background(), tok, s.store).Token()
 	if err != nil {
-		return &AuthState{Status: "expired", Message: err.Error()}, nil
+		// Deliberately silent: the raw token/refresh error must not reach
+		// the UI. The frontend shows a generic "Session expired" badge.
+		return &AuthState{Status: "expired"}, nil
 	}
 	if !refreshed.Expiry.IsZero() && time.Until(refreshed.Expiry) <= 0 {
 		return &AuthState{Status: "expired"}, nil

@@ -32,14 +32,18 @@
 
   $effect(() => {
     if (authState.status === "connected") {
-      OAuthService.Account().then((v) => {
-        if (v)
-          accountInfoState = {
-            name: v.name,
-            email: v.email,
-            photo_url: v.photo_url,
-          };
-      });
+      OAuthService.Account()
+        .then((v) => {
+          if (v)
+            accountInfoState = {
+              name: v.name,
+              email: v.email,
+              photo_url: v.photo_url,
+            };
+        })
+        // Silent: token may have expired between Status and Account;
+        // the expired badge already covers it.
+        .catch(() => {});
     } else {
       accountInfoState = null;
     }
@@ -88,8 +92,8 @@
     {:else if busy || authState.status === "connecting"}
       <p class="text-xs text-amber-400">Waiting for approval…</p>
     {:else if authState.status === "expired"}
-      <p class="text-xs text-rose-400">
-        {authState.message || "Session expired"}
+      <p class="text-xs text-rose-400" title="Session expired — reconnect">
+        Session expired — reconnect
       </p>
     {:else}
       <p class="text-xs text-slate-500">Not connected</p>
