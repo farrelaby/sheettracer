@@ -6,6 +6,50 @@ import { TriggeredBy } from "../../../bindings/sheettracer/internal/db/models";
 import { spreadsheetStore } from "../spreadsheets.svelte";
 import { scanRefresh } from "../scanRefresh.svelte";
 import { toast } from "../toast.svelte";
+import { SvelteSet } from "svelte/reactivity";
+
+// Shared across all useSpreadsheetActions() instances so the sidebar row
+// and the inspector stay in sync about which spreadsheet is scanning.
+const scanningIds = new SvelteSet<number>();
+
+function isScanning(id: number): boolean {
+  return scanningIds.has(id);
+}
+
+// Raw Go errors (e.g. "oauth: token validation: ...", "[about.get]: ...")
+// must never reach the toast. Auth/session problems resolve to null
+// (silent — OAuthStatus already shows the "Session expired" badge);
+// everything else maps to a short friendly message.
+function friendlyScanError(e: unknown): string | null {
+  const msg = String((e as any)?.message ?? e ?? "").toLowerCase();
+  if (
+    msg.includes("expired") ||
+    msg.includes("refresh") ||
+    msg.includes("reauth") ||
+    msg.includes("invalid_grant") ||
+    msg.includes("token") ||
+    msg.includes("oauth") ||
+    msg.includes("about.get") ||
+    msg.includes("drive service") ||
+    msg.includes("401") ||
+    msg.includes("403") ||
+    msg.includes("unauthorized") ||
+    msg.includes("unauthenticated")
+  ) {
+    return null;
+  }
+  if (
+    msg.includes("no access") ||
+    msg.includes("not found") ||
+    msg.includes("404")
+  ) {
+    return "Could not access this sheet — check sharing.";
+  }
+  if (msg.includes("network") || msg.includes("timeout") || msg.includes("econn")) {
+    return "Network error — try again.";
+  }
+  return "Scan failed — try again.";
+}
 
 export function useSpreadsheetActions() {
   async function addSheet(linkInput: string): Promise<boolean> {
@@ -54,8 +98,9 @@ export function useSpreadsheetActions() {
   }
 
   async function scanSpreadsheet(id: number, title: string) {
+    if (scanningIds.has(id)) return;
+    scanningIds.add(id);
     try {
-      toast.info(`Scanning ${title}...`);
       const result = await ScanService.ScanSpreadsheet(
         id,
         TriggeredBy.TriggerManual,
@@ -65,12 +110,15 @@ export function useSpreadsheetActions() {
       // inspector refetches without requiring reselect.
       spreadsheetStore.set((await SheetsService.List()) ?? []);
       scanRefresh.bump();
-      toast.success(`Scanned ${title} \u2014 ${result?.tabsScanned ?? 0} tabs`);
+      toast.success(`Scanned ${title} — ${result?.tabsScanned ?? 0} tabs`);
     } catch (e) {
       console.error("Scan failed:", e);
-      toast.error(`Scan failed: ${e}`);
+      const friendly = friendlyScanError(e);
+      if (friendly) toast.error(friendly);
+    } finally {
+      scanningIds.delete(id);
     }
   }
 
-  return { addSheet, removeSheet, scanSpreadsheet };
+  return { addSheet, removeSheet, scanSpreadsheet, isScanning };
 }
